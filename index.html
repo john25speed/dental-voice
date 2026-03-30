@@ -2,112 +2,78 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Стоматологический осмотр — Голосовой помощник</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, sans-serif;
+            font-family: -apple-system, 'Segoe UI', Tahoma, sans-serif;
             background: #f0f4f8;
             color: #1a1a2e;
             min-height: 100vh;
+            -webkit-text-size-adjust: 100%;
         }
         .container {
             max-width: 960px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 16px;
         }
-        h1 {
-            text-align: center;
-            font-size: 1.5rem;
-            margin-bottom: 6px;
-            color: #16213e;
-        }
-        .subtitle {
-            text-align: center;
-            color: #666;
-            font-size: 0.85rem;
-            margin-bottom: 20px;
-        }
+        h1 { text-align: center; font-size: 1.3rem; margin-bottom: 4px; color: #16213e; }
+        .subtitle { text-align: center; color: #666; font-size: 0.8rem; margin-bottom: 14px; }
 
         /* === Зубная формула === */
         .dental-chart {
             background: #fff;
             border-radius: 12px;
-            padding: 20px;
+            padding: 12px 8px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
+            margin-bottom: 14px;
         }
-        .chart-title {
-            font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 12px;
-            text-align: center;
-        }
-        .jaw-label {
-            text-align: center;
-            font-size: 0.8rem;
-            color: #888;
-            margin: 4px 0;
-        }
-        .chart-row {
-            display: flex;
-            justify-content: center;
+        .chart-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 8px; text-align: center; }
+        .jaw-label { text-align: center; font-size: 0.7rem; color: #888; margin: 2px 0; }
+
+        /* Сетка зубов: CSS Grid, всегда влезает */
+        .teeth-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr) 4px repeat(8, 1fr);
             gap: 2px;
             margin: 2px 0;
         }
-        .quadrant {
-            display: flex;
-            gap: 2px;
-        }
-        .quadrant.reverse { flex-direction: row-reverse; }
-        .separator {
-            width: 3px;
+        .grid-sep {
             background: #16213e;
-            margin: 0 4px;
             border-radius: 2px;
+            grid-row: span 1;
         }
         .tooth-cell {
-            width: 52px;
             text-align: center;
             cursor: pointer;
             user-select: none;
-            transition: all 0.15s;
         }
         .tooth-num {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             font-weight: 600;
             color: #555;
-            padding: 2px 0;
+            line-height: 1.4;
         }
         .tooth-val {
-            height: 36px;
-            line-height: 36px;
+            height: 32px;
+            line-height: 32px;
             border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 0.85rem;
+            border-radius: 5px;
+            font-size: 0.75rem;
             font-weight: 700;
             color: #16213e;
             background: #fafbfc;
             transition: all 0.15s;
+            overflow: hidden;
+            white-space: nowrap;
         }
-        .tooth-cell:hover .tooth-val {
-            border-color: #4a90d9;
-            background: #e8f0fe;
-        }
-        .tooth-cell.active .tooth-val {
-            border-color: #4a90d9;
-            background: #4a90d9;
-            color: #fff;
-        }
-        .tooth-cell.filled .tooth-val {
-            background: #fff3e0;
-            border-color: #f5a623;
-            color: #d35400;
-        }
-        .tooth-cell.filled.code-O .tooth-val { background: #fde; border-color: #e74c3c; color: #c0392b; }
-        .tooth-cell.filled.code-C .tooth-val { background: #fff8e1; border-color: #f39c12; color: #e67e22; }
-        .tooth-cell.filled.code-P .tooth-val { background: #fce4ec; border-color: #e91e63; color: #c2185b; }
+        .tooth-cell:active .tooth-val { border-color: #4a90d9; background: #e8f0fe; }
+        .tooth-cell.active .tooth-val { border-color: #4a90d9; background: #4a90d9; color: #fff; }
+        .tooth-cell.filled .tooth-val { background: #fff3e0; border-color: #f5a623; color: #d35400; }
+        .tooth-cell.filled.code-О .tooth-val { background: #fde; border-color: #e74c3c; color: #c0392b; }
+        .tooth-cell.filled.code-С .tooth-val { background: #fff8e1; border-color: #f39c12; color: #e67e22; }
+        .tooth-cell.filled.code-Р .tooth-val { background: #fce4ec; border-color: #e91e63; color: #c2185b; }
         .tooth-cell.filled.code-Pt .tooth-val { background: #f3e5f5; border-color: #9c27b0; color: #7b1fa2; }
         .tooth-cell.filled.code-R .tooth-val { background: #efebe9; border-color: #795548; color: #4e342e; }
         .tooth-cell.filled.code-П .tooth-val { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
@@ -115,287 +81,139 @@
         .tooth-cell.filled.code-И .tooth-val { background: #e0f7fa; border-color: #00bcd4; color: #00838f; }
         .tooth-cell.filled.code-А .tooth-val { background: #fff3e0; border-color: #ff9800; color: #e65100; }
 
-        .h-line {
-            height: 2px;
-            background: #16213e;
-            margin: 1px 0;
-            border-radius: 1px;
-        }
+        .h-line { height: 2px; background: #16213e; margin: 1px 0; border-radius: 1px; }
 
         /* === Легенда === */
         .legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            justify-content: center;
-            margin-top: 14px;
-            padding-top: 14px;
-            border-top: 1px solid #eee;
+            display: flex; flex-wrap: wrap; gap: 4px; justify-content: center;
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;
         }
-        .legend-item {
-            font-size: 0.7rem;
-            padding: 3px 8px;
-            border-radius: 4px;
-            background: #f5f5f5;
-            color: #555;
-        }
-        .legend-item b { margin-right: 3px; }
+        .legend-item { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; background: #f5f5f5; color: #555; }
+        .legend-item b { margin-right: 2px; }
 
         /* === Голосовое управление === */
         .voice-panel {
-            background: #fff;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
-            text-align: center;
+            background: #fff; border-radius: 12px; padding: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 14px; text-align: center;
         }
         .mic-btn {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            border: none;
-            background: #4a90d9;
-            color: #fff;
-            font-size: 2rem;
-            cursor: pointer;
-            transition: all 0.2s;
+            width: 64px; height: 64px; border-radius: 50%; border: none;
+            background: #4a90d9; color: #fff; font-size: 1.8rem; cursor: pointer;
             box-shadow: 0 4px 15px rgba(74,144,217,0.3);
-            position: relative;
+            -webkit-tap-highlight-color: transparent;
         }
-        .mic-btn:hover { background: #3a7bc8; transform: scale(1.05); }
         .mic-btn.recording {
             background: #e74c3c;
             box-shadow: 0 4px 15px rgba(231,76,60,0.4);
             animation: pulse 1.5s infinite;
         }
         @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(231,76,60,0.4); }
-            50% { box-shadow: 0 0 0 15px rgba(231,76,60,0); }
+            0%,100% { box-shadow: 0 0 0 0 rgba(231,76,60,0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(231,76,60,0); }
         }
-        .voice-status {
-            margin-top: 10px;
-            font-size: 0.85rem;
-            color: #888;
-            min-height: 24px;
-        }
+        .voice-status { margin-top: 8px; font-size: 0.8rem; color: #888; min-height: 20px; }
         .voice-status.listening { color: #e74c3c; font-weight: 600; }
-        .voice-transcript {
-            margin-top: 8px;
-            font-size: 0.9rem;
-            color: #333;
-            min-height: 20px;
-            font-style: italic;
+        .voice-transcript { margin-top: 6px; font-size: 0.8rem; color: #333; min-height: 18px; font-style: italic; }
+
+        /* === Подсказка (сворачиваемая) === */
+        .hint {
+            background: #e8f0fe; border-radius: 8px; padding: 10px 14px;
+            font-size: 0.75rem; color: #333; line-height: 1.4; margin-bottom: 14px;
         }
+        .hint summary { font-weight: 600; cursor: pointer; color: #16213e; font-size: 0.8rem; }
+        .hint b { color: #16213e; }
 
         /* === Лог === */
         .log-panel {
-            background: #fff;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
+            background: #fff; border-radius: 12px; padding: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 14px;
         }
-        .log-panel h3 {
-            font-size: 0.9rem;
-            margin-bottom: 10px;
-            color: #16213e;
-        }
-        .log-entries {
-            max-height: 180px;
-            overflow-y: auto;
-            font-size: 0.8rem;
-        }
+        .log-panel h3 { font-size: 0.85rem; margin-bottom: 8px; color: #16213e; }
+        .log-entries { max-height: 150px; overflow-y: auto; font-size: 0.75rem; }
         .log-entry {
-            padding: 5px 8px;
-            border-bottom: 1px solid #f0f0f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 4px 6px; border-bottom: 1px solid #f0f0f0;
+            display: flex; justify-content: space-between; align-items: center;
         }
         .log-entry:last-child { border-bottom: none; }
-        .log-entry .time { color: #aaa; font-size: 0.7rem; }
-        .log-entry .msg { flex: 1; margin: 0 8px; }
+        .log-entry .time { color: #aaa; font-size: 0.65rem; white-space: nowrap; }
+        .log-entry .msg { flex: 1; margin: 0 6px; }
         .log-entry .undo-btn {
-            font-size: 0.7rem;
-            border: 1px solid #ddd;
-            background: #fff;
-            padding: 2px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            color: #e74c3c;
+            font-size: 0.65rem; border: 1px solid #ddd; background: #fff;
+            padding: 2px 6px; border-radius: 4px; cursor: pointer; color: #e74c3c;
         }
-        .log-entry .undo-btn:hover { background: #fde; }
 
         /* === Доп. поля === */
         .extra-panel {
-            background: #fff;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
+            background: #fff; border-radius: 12px; padding: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 14px;
         }
-        .extra-panel h3 { font-size: 0.9rem; margin-bottom: 10px; }
+        .extra-panel h3 { font-size: 0.8rem; margin-bottom: 8px; }
         .extra-panel textarea {
-            width: 100%;
-            height: 80px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            padding: 10px;
-            font-size: 0.85rem;
-            resize: vertical;
-            font-family: inherit;
+            width: 100%; height: 70px; border: 2px solid #ddd; border-radius: 8px;
+            padding: 8px; font-size: 0.8rem; resize: vertical; font-family: inherit;
         }
         .extra-panel textarea:focus { outline: none; border-color: #4a90d9; }
 
         /* === Кнопки === */
-        .actions {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
+        .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
         .btn {
-            padding: 10px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
+            padding: 8px 18px; border: none; border-radius: 8px;
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
         }
         .btn-primary { background: #4a90d9; color: #fff; }
-        .btn-primary:hover { background: #3a7bc8; }
         .btn-danger { background: #e74c3c; color: #fff; }
-        .btn-danger:hover { background: #c0392b; }
         .btn-secondary { background: #eee; color: #333; }
-        .btn-secondary:hover { background: #ddd; }
 
-        /* === Подсказка === */
-        .hint {
-            background: #e8f0fe;
-            border-radius: 8px;
-            padding: 12px 16px;
-            font-size: 0.8rem;
-            color: #333;
-            line-height: 1.5;
-            margin-bottom: 20px;
-        }
-        .hint b { color: #16213e; }
-
-        /* === Попап ручного ввода === */
+        /* === Модалка === */
         .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.4);
-            z-index: 100;
-            justify-content: center;
-            align-items: center;
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); z-index: 100; justify-content: center; align-items: center;
         }
         .modal-overlay.show { display: flex; }
         .modal {
-            background: #fff;
-            border-radius: 12px;
-            padding: 24px;
-            width: 320px;
-            text-align: center;
+            background: #fff; border-radius: 12px; padding: 20px;
+            width: min(320px, 90vw); text-align: center;
         }
-        .modal h3 { margin-bottom: 16px; font-size: 1rem; }
-        .modal .codes {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 16px;
-        }
+        .modal h3 { margin-bottom: 14px; font-size: 0.95rem; }
+        .modal .codes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
         .modal .code-btn {
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            background: #fafbfc;
-            cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 600;
-            transition: all 0.15s;
+            padding: 10px 4px; border: 2px solid #ddd; border-radius: 8px;
+            background: #fafbfc; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+            -webkit-tap-highlight-color: transparent;
         }
-        .modal .code-btn:hover { border-color: #4a90d9; background: #e8f0fe; }
-        .modal .code-btn .code-label { font-size: 0.65rem; color: #888; font-weight: 400; display: block; }
+        .modal .code-btn:active { border-color: #4a90d9; background: #e8f0fe; }
+        .modal .code-btn .code-label { font-size: 0.6rem; color: #888; font-weight: 400; display: block; }
         .modal .close-btn {
-            margin-top: 8px;
-            padding: 8px 20px;
-            border: 1px solid #ddd;
-            background: #fff;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.8rem;
+            padding: 8px 20px; border: 1px solid #ddd; background: #fff;
+            border-radius: 6px; cursor: pointer; font-size: 0.8rem;
         }
 
         /* === Пациент === */
         .patient-info {
-            background: #fff;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
+            background: #fff; border-radius: 12px; padding: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 14px;
+            display: flex; gap: 8px; flex-wrap: wrap;
         }
         .patient-info input {
-            flex: 1;
-            min-width: 200px;
-            padding: 8px 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-family: inherit;
+            flex: 1; min-width: 0; padding: 8px 10px; border: 2px solid #ddd;
+            border-radius: 8px; font-size: 0.85rem; font-family: inherit;
         }
         .patient-info input:focus { outline: none; border-color: #4a90d9; }
+        .patient-info input[type="date"] { max-width: 160px; }
 
-        /* === MOBILE === */
-        @media (max-width: 640px) {
-            .container { padding: 10px; }
-            h1 { font-size: 1.2rem; }
-            .subtitle { font-size: 0.75rem; margin-bottom: 12px; }
-
-            .dental-chart { padding: 10px; overflow-x: auto; }
-            .tooth-cell { width: 36px; }
-            .tooth-val { height: 30px; line-height: 30px; font-size: 0.7rem; border-width: 1.5px; border-radius: 4px; }
-            .tooth-num { font-size: 0.65rem; }
-            .separator { width: 2px; margin: 0 2px; }
-
-            .legend { gap: 4px; }
-            .legend-item { font-size: 0.6rem; padding: 2px 5px; }
-
-            .hint { font-size: 0.7rem; padding: 10px 12px; }
-            .hint br { display: none; }
-
-            .mic-btn { width: 64px; height: 64px; font-size: 1.7rem; }
-            .voice-status { font-size: 0.8rem; }
-            .voice-transcript { font-size: 0.8rem; }
-
-            .patient-info { flex-direction: column; gap: 8px; }
-            .patient-info input { min-width: unset; width: 100%; }
-
-            .actions { gap: 6px; }
-            .btn { padding: 8px 16px; font-size: 0.8rem; }
-
-            .modal { width: 290px; padding: 18px; }
-            .modal .codes { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-            .modal .code-btn { padding: 8px 4px; font-size: 0.8rem; }
-        }
-
-        @media (max-width: 380px) {
-            .tooth-cell { width: 30px; }
-            .tooth-val { height: 26px; line-height: 26px; font-size: 0.6rem; }
+        /* === Мобильные доп. стили === */
+        @media (max-width: 480px) {
+            .container { padding: 8px; }
+            h1 { font-size: 1.1rem; }
+            .tooth-val { height: 28px; line-height: 28px; font-size: 0.65rem; border-width: 1.5px; }
             .tooth-num { font-size: 0.55rem; }
-            .chart-row { gap: 1px; }
-            .quadrant { gap: 1px; }
+            .teeth-grid { gap: 1px; }
+            .patient-info { flex-direction: column; }
+            .patient-info input[type="date"] { max-width: none; }
         }
 
         @media print {
-            .voice-panel, .log-panel, .hint, .actions, .mic-btn { display: none !important; }
+            .voice-panel, .log-panel, .hint, .actions { display: none !important; }
             body { background: #fff; }
             .dental-chart, .extra-panel, .patient-info { box-shadow: none; border: 1px solid #ccc; }
         }
@@ -407,78 +225,77 @@
     <h1>&#128422; Стоматологический осмотр</h1>
     <p class="subtitle">Голосовой помощник для заполнения зубной формулы</p>
 
-    <!-- Пациент -->
     <div class="patient-info">
         <input type="text" id="patientName" placeholder="ФИО пациента">
         <input type="date" id="examDate">
     </div>
 
-    <!-- Подсказка -->
-    <div class="hint">
-        <b>Голосовые команды:</b> «верхний правый шесть — кариес», «нижняя левая восьмёрка — отсутствует», «пятый верхний левый — пломба»<br>
-        <b>Очистить:</b> «очистить верхний правый три» или «стереть нижний левый один»<br>
-        <b>Также:</b> можно кликнуть на зуб для ручного ввода
-    </div>
+    <!-- Подсказка — свёрнута по умолчанию на мобильном -->
+    <details class="hint">
+        <summary>Как пользоваться</summary>
+        <br>
+        <b>Голос:</b> «верхний правый шесть кариес», «нижняя левая восьмёрка отсутствует»<br>
+        <b>Очистить:</b> «очистить верхний правый три»<br>
+        <b>Тап:</b> нажмите на ячейку зуба для ручного выбора<br>
+        <b>Совет:</b> говорите чётко, между командами делайте паузу ~2 сек
+    </details>
 
-    <!-- Зубная формула -->
+    <!-- Зубная формула — CSS Grid, всегда влезает -->
     <div class="dental-chart">
         <div class="chart-title">Зубная формула</div>
-
         <div class="jaw-label">Верхняя челюсть</div>
-        <!-- Верх: правый квадрант (8..1) | левый квадрант (1..8) -->
-        <div class="chart-row" id="upperNumbers"></div>
-        <div class="chart-row" id="upperValues"></div>
+
+        <div class="teeth-grid" id="upperNumbers"></div>
+        <div class="teeth-grid" id="upperValues"></div>
 
         <div class="h-line"></div>
 
-        <!-- Низ: правый квадрант (8..1) | левый квадрант (1..8) -->
-        <div class="chart-row" id="lowerValues"></div>
-        <div class="chart-row" id="lowerNumbers"></div>
+        <div class="teeth-grid" id="lowerValues"></div>
+        <div class="teeth-grid" id="lowerNumbers"></div>
         <div class="jaw-label">Нижняя челюсть</div>
 
         <div class="legend">
-            <div class="legend-item"><b>О</b> отсутствует</div>
-            <div class="legend-item"><b>R</b> корень</div>
-            <div class="legend-item"><b>С</b> кариес</div>
-            <div class="legend-item"><b>Р</b> пульпит</div>
-            <div class="legend-item"><b>Pt</b> периодонтит</div>
-            <div class="legend-item"><b>П</b> пломба</div>
-            <div class="legend-item"><b>А I/II/III</b> пародонтит</div>
-            <div class="legend-item"><b>К</b> коронка</div>
-            <div class="legend-item"><b>И</b> искусственный</div>
+            <div class="legend-item"><b>О</b>нет</div>
+            <div class="legend-item"><b>R</b>корень</div>
+            <div class="legend-item"><b>С</b>кариес</div>
+            <div class="legend-item"><b>Р</b>пульпит</div>
+            <div class="legend-item"><b>Pt</b>периодонтит</div>
+            <div class="legend-item"><b>П</b>пломба</div>
+            <div class="legend-item"><b>А</b>пародонтит</div>
+            <div class="legend-item"><b>К</b>коронка</div>
+            <div class="legend-item"><b>И</b>искусств.</div>
         </div>
     </div>
 
     <!-- Голос -->
     <div class="voice-panel">
         <button class="mic-btn" id="micBtn" onclick="toggleRecording()">&#127908;</button>
-        <div class="voice-status" id="voiceStatus">Нажмите для начала записи</div>
+        <div class="voice-status" id="voiceStatus">Нажмите для записи</div>
         <div class="voice-transcript" id="voiceTranscript"></div>
     </div>
 
     <!-- Лог -->
     <div class="log-panel">
-        <h3>&#128203; Журнал записей</h3>
+        <h3>&#128203; Журнал</h3>
         <div class="log-entries" id="logEntries">
-            <div style="color:#aaa; text-align:center; padding:20px; font-size:0.8rem;">Пока пусто — начните диктовать</div>
+            <div style="color:#aaa;text-align:center;padding:16px;font-size:0.75rem;">Начните диктовать или нажмите на зуб</div>
         </div>
     </div>
 
-    <!-- Доп. поля -->
+    <!-- Слизистая -->
     <div class="extra-panel">
-        <h3>Состояние слизистой оболочки полости рта, дёсен, альвеолярных отростков и нёба</h3>
+        <h3>Состояние слизистой, дёсен, нёба</h3>
         <textarea id="mucosaText" placeholder="Диктуйте или введите вручную..."></textarea>
     </div>
 
-    <!-- Кнопки -->
     <div class="actions">
-        <button class="btn btn-primary" onclick="exportPDF()">&#128424; Печать / PDF</button>
-        <button class="btn btn-secondary" onclick="exportJSON()">&#128190; Сохранить JSON</button>
-        <button class="btn btn-danger" onclick="clearAll()">&#128465; Очистить всё</button>
+        <button class="btn btn-primary" onclick="exportPDF()">&#128424; Печать</button>
+        <button class="btn btn-secondary" onclick="exportJSON()">&#128190; JSON</button>
+        <button class="btn btn-danger" onclick="clearAll()">&#128465; Очистить</button>
     </div>
 </div>
 
-<!-- Модалка ручного ввода -->
+<!-- Модалка -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
     <div class="modal">
         <h3 id="modalTitle">Зуб #</h3>
@@ -502,90 +319,68 @@
 
 <script>
 // ============ DATA ============
-// Квадранты: UR=верхний правый, UL=верхний левый, LR=нижний правый, LL=нижний левый
 const data = {};
 const quadrants = ['UR','UL','LR','LL'];
-quadrants.forEach(q => {
-    data[q] = {};
-    for (let i = 1; i <= 8; i++) data[q][i] = '';
-});
+quadrants.forEach(q => { data[q] = {}; for (let i = 1; i <= 8; i++) data[q][i] = ''; });
+const logEntries = [];
+let selectedTooth = null;
 
-const log = [];
-let selectedTooth = null; // {quadrant, num}
-
-// ============ BUILD CHART ============
+// ============ BUILD CHART (CSS Grid — всегда влезает) ============
 function buildChart() {
-    const upperNums = document.getElementById('upperNumbers');
-    const upperVals = document.getElementById('upperValues');
-    const lowerVals = document.getElementById('lowerValues');
-    const lowerNums = document.getElementById('lowerNumbers');
-
-    [upperNums, upperVals, lowerVals, lowerNums].forEach(el => el.innerHTML = '');
-
-    // Upper right (8..1) | Upper left (1..8)
-    buildQuadrantRow(upperNums, upperVals, 'UR', true, 'UL', false, true);
-    // Lower right (8..1) | Lower left (1..8)
-    buildQuadrantRow(lowerNums, lowerVals, 'LR', true, 'LL', false, false);
+    buildGridRow('upperNumbers', 'upperValues', 'UR', 'UL', true);
+    buildGridRow('lowerNumbers', 'lowerValues', 'LR', 'LL', false);
 }
 
-function buildQuadrantRow(numRow, valRow, qLeft, reverseLeft, qRight, reverseRight, isUpper) {
-    const leftDiv = document.createElement('div');
-    leftDiv.className = 'quadrant' + (reverseLeft ? ' reverse' : '');
-    const leftValDiv = document.createElement('div');
-    leftValDiv.className = 'quadrant' + (reverseLeft ? ' reverse' : '');
+function buildGridRow(numId, valId, qRight, qLeft, isUpper) {
+    const numGrid = document.getElementById(numId);
+    const valGrid = document.getElementById(valId);
+    numGrid.innerHTML = '';
+    valGrid.innerHTML = '';
 
-    const rightDiv = document.createElement('div');
-    rightDiv.className = 'quadrant' + (reverseRight ? ' reverse' : '');
-    const rightValDiv = document.createElement('div');
-    rightValDiv.className = 'quadrant' + (reverseRight ? ' reverse' : '');
-
+    // Правый квадрант: 8,7,6,5,4,3,2,1
+    for (let i = 8; i >= 1; i--) {
+        numGrid.appendChild(makeNumCell(i));
+        valGrid.appendChild(makeValCell(qRight, i));
+    }
+    // Разделитель
+    const sep1 = document.createElement('div'); sep1.className = 'grid-sep';
+    const sep2 = document.createElement('div'); sep2.className = 'grid-sep';
+    numGrid.appendChild(sep1);
+    valGrid.appendChild(sep2);
+    // Левый квадрант: 1,2,3,4,5,6,7,8
     for (let i = 1; i <= 8; i++) {
-        const cellL = makeToothCell(qLeft, i, isUpper);
-        leftDiv.appendChild(cellL.numEl);
-        leftValDiv.appendChild(cellL.valEl);
-
-        const cellR = makeToothCell(qRight, i, isUpper);
-        rightDiv.appendChild(cellR.numEl);
-        rightValDiv.appendChild(cellR.valEl);
+        numGrid.appendChild(makeNumCell(i));
+        valGrid.appendChild(makeValCell(qLeft, i));
     }
-
-    const sep1 = document.createElement('div'); sep1.className = 'separator';
-    const sep2 = document.createElement('div'); sep2.className = 'separator';
-
-    numRow.appendChild(leftDiv);
-    numRow.appendChild(sep1);
-    numRow.appendChild(rightDiv);
-
-    valRow.appendChild(leftValDiv);
-    valRow.appendChild(sep2);
-    valRow.appendChild(rightValDiv);
 }
 
-function makeToothCell(quadrant, num, isUpper) {
-    const numEl = document.createElement('div');
-    numEl.className = 'tooth-cell';
-    const numDiv = document.createElement('div');
-    numDiv.className = 'tooth-num';
-    numDiv.textContent = num;
-    numEl.appendChild(numDiv);
+function makeNumCell(num) {
+    const d = document.createElement('div');
+    d.className = 'tooth-num';
+    d.textContent = num;
+    return d;
+}
 
-    const valEl = document.createElement('div');
-    valEl.className = 'tooth-cell';
-    valEl.id = `tooth-${quadrant}-${num}`;
-    const valDiv = document.createElement('div');
-    valDiv.className = 'tooth-val';
-    valDiv.textContent = data[quadrant][num] || '';
-    valEl.appendChild(valDiv);
+function makeValCell(quadrant, num) {
+    const cell = document.createElement('div');
+    cell.className = 'tooth-cell';
+    cell.id = `tooth-${quadrant}-${num}`;
+    const val = document.createElement('div');
+    val.className = 'tooth-val';
+    val.textContent = data[quadrant][num] || '';
+    cell.appendChild(val);
+    applyColor(cell, data[quadrant][num]);
+    cell.onclick = () => openModal(quadrant, num);
+    return cell;
+}
 
-    if (data[quadrant][num]) {
-        valEl.classList.add('filled');
-        const code = data[quadrant][num].replace(/\s.*/,'');
-        valEl.classList.add('code-' + code);
+function applyColor(cell, code) {
+    cell.classList.remove('filled','code-О','code-С','code-Р','code-Pt','code-R','code-П','code-К','code-И','code-А');
+    if (code) {
+        cell.classList.add('filled');
+        const base = code.replace(/\s.*/,'');
+        cell.classList.add('code-' + base);
     }
-
-    valEl.onclick = () => openModal(quadrant, num);
-
-    return { numEl, valEl };
 }
 
 function updateTooth(quadrant, num) {
@@ -594,15 +389,7 @@ function updateTooth(quadrant, num) {
     const valDiv = el.querySelector('.tooth-val');
     const val = data[quadrant][num];
     valDiv.textContent = val || '';
-
-    el.className = 'tooth-cell';
-    if (val) {
-        el.classList.add('filled');
-        const code = val.replace(/\s.*/,'');
-        el.classList.add('code-' + code);
-    }
-
-    // flash
+    applyColor(el, val);
     el.classList.add('active');
     setTimeout(() => el.classList.remove('active'), 500);
 }
@@ -610,17 +397,14 @@ function updateTooth(quadrant, num) {
 // ============ MODAL ============
 function openModal(quadrant, num) {
     selectedTooth = { quadrant, num };
-    const qNames = { UR: 'верх. правый', UL: 'верх. левый', LR: 'ниж. правый', LL: 'ниж. левый' };
+    const qNames = { UR: 'верх. прав.', UL: 'верх. лев.', LR: 'ниж. прав.', LL: 'ниж. лев.' };
     document.getElementById('modalTitle').textContent = `Зуб ${num} (${qNames[quadrant]})`;
     document.getElementById('modalOverlay').classList.add('show');
 }
-
 function closeModal(e) {
-    if (e.target === document.getElementById('modalOverlay')) {
+    if (e.target === document.getElementById('modalOverlay'))
         document.getElementById('modalOverlay').classList.remove('show');
-    }
 }
-
 function setManual(code) {
     if (!selectedTooth) return;
     const { quadrant, num } = selectedTooth;
@@ -629,24 +413,28 @@ function setManual(code) {
     updateTooth(quadrant, num);
     addLog(quadrant, num, code, prev, 'ручной');
     document.getElementById('modalOverlay').classList.remove('show');
-    speak(formatConfirmation(quadrant, num, code));
 }
 
-// ============ VOICE ============
+// ============ VOICE (с защитой от самослышания) ============
 let recognition = null;
 let isRecording = false;
+let isSpeaking = false;  // TTS сейчас говорит — игнорируем распознавание
 
-// Debounce: на мобильном Web Speech API часто разбивает фразу на куски,
-// каждый приходит как isFinal. Собираем в буфер, обрабатываем после паузы.
+// Debounce-буфер
 let voiceBuffer = '';
 let voiceTimer = null;
-const VOICE_DEBOUNCE_MS = 1200; // ждём 1.2с тишины перед обработкой
+const DEBOUNCE_MS = 1500;
 
 function flushVoiceBuffer() {
     voiceTimer = null;
     const text = voiceBuffer.trim();
     voiceBuffer = '';
     if (!text) return;
+    // Если TTS сейчас говорит — выбросить (это эхо)
+    if (isSpeaking) {
+        console.log('Skipped echo:', text);
+        return;
+    }
     document.getElementById('voiceTranscript').textContent = '✓ ' + text;
     processVoice(text);
 }
@@ -654,24 +442,26 @@ function flushVoiceBuffer() {
 function initSpeech() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-        document.getElementById('voiceStatus').textContent = 'Браузер не поддерживает распознавание речи. Используйте Chrome.';
+        document.getElementById('voiceStatus').textContent = 'Нужен Chrome для голосового ввода';
         return;
     }
     recognition = new SR();
     recognition.lang = 'ru-RU';
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.maxAlternatives = 3;
+    recognition.maxAlternatives = 1;
 
     recognition.onresult = (event) => {
+        // Если TTS говорит — полностью игнорируем
+        if (isSpeaking) return;
+
         let interim = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
             const t = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                // Добавляем в буфер, сбрасываем таймер
                 voiceBuffer += (voiceBuffer ? ' ' : '') + t.trim();
                 if (voiceTimer) clearTimeout(voiceTimer);
-                voiceTimer = setTimeout(flushVoiceBuffer, VOICE_DEBOUNCE_MS);
+                voiceTimer = setTimeout(flushVoiceBuffer, DEBOUNCE_MS);
                 document.getElementById('voiceTranscript').textContent = '⏳ ' + voiceBuffer;
             } else {
                 interim += t;
@@ -683,64 +473,79 @@ function initSpeech() {
     };
 
     recognition.onerror = (e) => {
+        if (e.error === 'no-speech' || e.error === 'aborted') return;
         console.error('Speech error:', e.error);
-        if (e.error === 'no-speech') return;
-        if (e.error === 'aborted') return;
-        document.getElementById('voiceStatus').textContent = 'Ошибка: ' + e.error;
     };
 
     recognition.onend = () => {
-        // Когда recognition останавливается (мобильный делает это часто),
-        // даём буферу дообработаться, потом перезапускаем
         if (isRecording) {
-            // Если в буфере что-то есть — обработаем перед рестартом
-            if (voiceBuffer && voiceTimer) {
-                clearTimeout(voiceTimer);
-                voiceTimer = setTimeout(() => {
-                    flushVoiceBuffer();
-                }, VOICE_DEBOUNCE_MS);
-            }
-            // Перезапуск с задержкой чтобы не конфликтовать
             setTimeout(() => {
                 if (isRecording) {
                     try { recognition.start(); } catch(e) {}
                 }
-            }, 300);
+            }, 400);
         }
     };
 }
 
 function toggleRecording() {
     if (!recognition) { initSpeech(); if (!recognition) return; }
-
     if (isRecording) {
         isRecording = false;
         recognition.stop();
+        // Сбросить буфер если есть
+        if (voiceTimer) { clearTimeout(voiceTimer); flushVoiceBuffer(); }
         document.getElementById('micBtn').classList.remove('recording');
         document.getElementById('voiceStatus').textContent = 'Запись остановлена';
         document.getElementById('voiceStatus').classList.remove('listening');
     } else {
         isRecording = true;
-        recognition.start();
+        try { recognition.start(); } catch(e) {}
         document.getElementById('micBtn').classList.add('recording');
         document.getElementById('voiceStatus').textContent = 'Слушаю...';
         document.getElementById('voiceStatus').classList.add('listening');
     }
 }
 
+// ============ TTS (с блокировкой распознавания) ============
+function speak(text) {
+    if (!window.speechSynthesis) return;
+    // Отмечаем что говорим — recognition будет игнорировать вход
+    isSpeaking = true;
+    // Очищаем буфер — всё что пришло во время speak это эхо
+    voiceBuffer = '';
+    if (voiceTimer) { clearTimeout(voiceTimer); voiceTimer = null; }
+
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ru-RU';
+    u.rate = 1.3;
+    u.volume = 0.6;
+    u.onend = () => {
+        // Ждём ещё чуть-чуть после окончания TTS — эхо может прийти с задержкой
+        setTimeout(() => {
+            isSpeaking = false;
+            voiceBuffer = ''; // на всякий случай сбросить остаточное эхо
+        }, 800);
+    };
+    u.onerror = () => {
+        setTimeout(() => { isSpeaking = false; }, 500);
+    };
+    window.speechSynthesis.speak(u);
+}
+
 // ============ NLP PARSER ============
 function processVoice(text) {
     const lower = text.toLowerCase().trim();
 
-    // Проверка на команду "слизистая" — надиктовка в поле
-    if (lower.startsWith('слизистая') || lower.startsWith('десна') || lower.startsWith('дёсна') || lower.startsWith('нёбо') || lower.startsWith('небо')) {
-        document.getElementById('mucosaText').value += (document.getElementById('mucosaText').value ? ' ' : '') + text;
-        addLogRaw('📝 Слизистая: ' + text);
-        speak('Записано в поле слизистой');
+    // Слизистая
+    if (/^(слизист|десн|дёсн|нёбо|небо)/.test(lower)) {
+        const ta = document.getElementById('mucosaText');
+        ta.value += (ta.value ? ' ' : '') + text;
+        addLogRaw('📝 ' + text);
+        speak('Записано');
         return;
     }
 
-    // Парсинг: квадрант + номер зуба + диагноз
     const parsed = parseToothCommand(lower);
     if (parsed) {
         const { quadrant, num, code, isClear } = parsed;
@@ -750,66 +555,51 @@ function processVoice(text) {
         addLog(quadrant, num, isClear ? '' : code, prev, 'голос');
         speak(formatConfirmation(quadrant, num, isClear ? '' : code));
     } else {
-        // Не спамим "не понял" — просто лог. Стоматолог увидит и повторит.
-        addLogRaw('⚠️ Не распознано: «' + text + '»');
+        addLogRaw('⚠️ «' + text + '»');
     }
 }
 
 function parseToothCommand(text) {
-    // Определяем: очистить?
-    const isClear = /(?:очист|стер|убр|удал|снять|сброс)/.test(text);
+    const isClear = /(?:очист|стер|убр|удал[иь]|снять|сброс)/.test(text);
 
-    // Определяем квадрант
-    let jaw = null; // upper / lower
-    let side = null; // right / left
-
+    let jaw = null, side = null;
     if (/верх/.test(text)) jaw = 'upper';
     if (/нижн/.test(text)) jaw = 'lower';
     if (/прав/.test(text)) side = 'right';
     if (/лев/.test(text)) side = 'left';
 
-    // Определяем номер зуба
+    // Номер зуба
     let num = null;
-    const wordToNum = {
-        'один': 1, 'одна': 1, 'первый': 1, 'первая': 1, 'единиц': 1, 'единичк': 1,
-        'два': 2, 'две': 2, 'второй': 2, 'вторая': 2, 'двойк': 2,
-        'три': 3, 'третий': 3, 'третья': 3, 'тройк': 3, 'тройка': 3,
-        'четыре': 4, 'четвёрт': 4, 'четверт': 4, 'четвёрк': 4, 'четверк': 4,
-        'пять': 5, 'пятый': 5, 'пятая': 5, 'пятёрк': 5, 'пятерк': 5,
-        'шесть': 6, 'шестой': 6, 'шестая': 6, 'шестёрк': 6, 'шестерк': 6,
-        'семь': 7, 'седьмой': 7, 'седьмая': 7, 'семёрк': 7, 'семерк': 7,
-        'восемь': 8, 'восьмой': 8, 'восьмая': 8, 'восьмёрк': 8, 'восьмерк': 8,
-    };
-
-    // Сначала ищем цифру
     const digitMatch = text.match(/(\d)/);
-    if (digitMatch) {
-        num = parseInt(digitMatch[1]);
-    }
+    if (digitMatch) num = parseInt(digitMatch[1]);
 
-    // Потом слова
     if (!num) {
-        for (const [word, n] of Object.entries(wordToNum)) {
-            if (text.includes(word)) { num = n; break; }
+        const wordMap = [
+            [/\b(один|одна|перв|единиц|единичк)/, 1],
+            [/\b(два|две|втор|двойк)/, 2],
+            [/\b(три(?!д)|трет|тройк)/, 3],
+            [/\b(четыр|четвёр|четвер)/, 4],
+            [/\b(пять|пят[аоы]|пятёр|пятер)/, 5],
+            [/\b(шесть|шест[аоы]|шестёр|шестер)/, 6],
+            [/\b(семь|седьм|семёр|семер)/, 7],
+            [/\b(восемь|восьм|восьмёр|восьмер)/, 8],
+        ];
+        for (const [rx, n] of wordMap) {
+            if (rx.test(text)) { num = n; break; }
         }
     }
 
     if (!num || num < 1 || num > 8) return null;
-    if (!jaw || !side) {
-        // Попробуем угадать из контекста — если не указано, не заполняем
-        return null;
-    }
+    if (!jaw || !side) return null;
 
     const quadrant = (jaw === 'upper' ? 'U' : 'L') + (side === 'right' ? 'R' : 'L');
-
     if (isClear) return { quadrant, num, code: '', isClear: true };
 
-    // Определяем диагноз
     let code = null;
     const diagMap = [
-        { patterns: ['отсутств', 'нет зуба', 'нету', 'удалён', 'удален', 'отсутст'], code: 'О' },
+        { patterns: ['отсутств', 'нет зуба', 'нету', 'удалён', 'удален'], code: 'О' },
         { patterns: ['корень', 'корня'], code: 'R' },
-        { patterns: ['кариес', 'кариос'], code: 'С' },
+        { patterns: ['кариес', 'кариос', 'кариез'], code: 'С' },
         { patterns: ['пульпит'], code: 'Р' },
         { patterns: ['периодонтит', 'переодонтит'], code: 'Pt' },
         { patterns: ['пломб', 'запломб'], code: 'П' },
@@ -819,27 +609,14 @@ function parseToothCommand(text) {
         { patterns: ['пародонтит второй', 'пародонтит 2', 'пародонтит два'], code: 'А II' },
         { patterns: ['пародонтит первой', 'пародонтит 1', 'пародонтит один', 'пародонтит'], code: 'А I' },
     ];
-
     for (const d of diagMap) {
         for (const p of d.patterns) {
             if (text.includes(p)) { code = d.code; break; }
         }
         if (code) break;
     }
-
     if (!code) return null;
-
     return { quadrant, num, code, isClear: false };
-}
-
-// ============ TTS ============
-function speak(text) {
-    if (!window.speechSynthesis) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ru-RU';
-    u.rate = 1.2;
-    u.volume = 0.7;
-    window.speechSynthesis.speak(u);
 }
 
 function formatConfirmation(quadrant, num, code) {
@@ -847,88 +624,69 @@ function formatConfirmation(quadrant, num, code) {
     const codeNames = {
         'О': 'отсутствует', 'R': 'корень', 'С': 'кариес', 'Р': 'пульпит',
         'Pt': 'периодонтит', 'П': 'пломба', 'К': 'коронка', 'И': 'искусственный',
-        'А I': 'пародонтит первой степени', 'А II': 'пародонтит второй степени', 'А III': 'пародонтит третьей степени',
-        '': 'очищено'
+        'А I': 'пародонтит один', 'А II': 'пародонтит два', 'А III': 'пародонтит три', '': 'очищено'
     };
-    return `${qNames[quadrant]} ${num}: ${codeNames[code] || code || 'очищено'}`;
+    return `${num} ${codeNames[code] || 'очищено'}`;
 }
 
 // ============ LOG ============
 function addLog(quadrant, num, code, prev, source) {
     const qNames = { UR: 'в.п.', UL: 'в.л.', LR: 'н.п.', LL: 'н.л.' };
     const now = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const msg = code
-        ? `${qNames[quadrant]} ${num} → ${code}`
-        : `${qNames[quadrant]} ${num} → очищено`;
-    const entry = { time: now, msg, source, quadrant, num, prev, code };
-    log.push(entry);
+    const msg = code ? `${qNames[quadrant]} ${num} → ${code}` : `${qNames[quadrant]} ${num} → ∅`;
+    logEntries.push({ time: now, msg, source, quadrant, num, prev, code });
     renderLog();
 }
-
 function addLogRaw(msg) {
     const now = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    log.push({ time: now, msg, raw: true });
+    logEntries.push({ time: now, msg, raw: true });
     renderLog();
 }
-
 function renderLog() {
     const el = document.getElementById('logEntries');
-    if (log.length === 0) {
-        el.innerHTML = '<div style="color:#aaa;text-align:center;padding:20px;font-size:0.8rem;">Пока пусто</div>';
+    if (!logEntries.length) {
+        el.innerHTML = '<div style="color:#aaa;text-align:center;padding:16px;font-size:0.75rem;">Начните диктовать</div>';
         return;
     }
-    el.innerHTML = log.slice().reverse().map((e, idx) => {
-        const realIdx = log.length - 1 - idx;
+    el.innerHTML = logEntries.slice().reverse().map((e, idx) => {
+        const realIdx = logEntries.length - 1 - idx;
         const undo = !e.raw ? `<button class="undo-btn" onclick="undoEntry(${realIdx})">↩</button>` : '';
         return `<div class="log-entry"><span class="time">${e.time}</span><span class="msg">${e.msg}</span>${undo}</div>`;
     }).join('');
-    el.scrollTop = 0;
 }
-
 function undoEntry(idx) {
-    const entry = log[idx];
+    const entry = logEntries[idx];
     if (!entry || entry.raw) return;
     data[entry.quadrant][entry.num] = entry.prev || '';
     updateTooth(entry.quadrant, entry.num);
-    log.splice(idx, 1);
+    logEntries.splice(idx, 1);
     renderLog();
-    speak('Отменено');
 }
 
 // ============ EXPORT ============
-function exportPDF() {
-    window.print();
-}
-
+function exportPDF() { window.print(); }
 function exportJSON() {
     const result = {
         patient: document.getElementById('patientName').value,
         date: document.getElementById('examDate').value,
-        teeth: data,
-        mucosa: document.getElementById('mucosaText').value,
-        log: log,
-        exportedAt: new Date().toISOString()
+        teeth: data, mucosa: document.getElementById('mucosaText').value,
+        log: logEntries, exportedAt: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `dental-exam-${result.date || 'no-date'}.json`;
-    a.click();
+    a.href = URL.createObjectURL(blob); a.download = `dental-${result.date || 'exam'}.json`; a.click();
 }
-
 function clearAll() {
     if (!confirm('Очистить все данные?')) return;
     quadrants.forEach(q => { for (let i = 1; i <= 8; i++) data[q][i] = ''; });
-    log.length = 0;
+    logEntries.length = 0;
     document.getElementById('mucosaText').value = '';
-    buildChart();
-    renderLog();
+    buildChart(); renderLog();
 }
 
 // ============ INIT ============
 document.getElementById('examDate').valueAsDate = new Date();
 buildChart();
-initSpeech();
 </script>
 </body>
 </html>
