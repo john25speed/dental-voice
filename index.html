@@ -478,68 +478,52 @@ function initSpeech() {
     recognition.lang = 'ru-RU';
     recognition.maxAlternatives = 1;
 
-    if (isMobile) {
-        // МОБИЛЬНЫЙ: одна фраза за раз, без continuous
-        // API сам определяет конец речи по паузе, возвращает ПОЛНЫЙ результат
-        recognition.continuous = false;
-        recognition.interimResults = false;
+    // Единый режим: continuous + debounce (на мобильном дольше ждём)
+    recognition.continuous = true;
+    recognition.interimResults = true;
 
-        recognition.onresult = (event) => {
-            const text = event.results[0][0].transcript.trim();
-            if (!text) return;
-            document.getElementById('voiceTranscript').textContent = '✓ ' + text;
-            processVoice(text);
-        };
+    const DEBOUNCE = isMobile ? 2000 : 1200; // мобильный: 2 сек тишины, ПК: 1.2 сек
+    let buffer = '';
+    let bufTimer = null;
 
-        recognition.onend = () => {
-            // Перезапуск управляется из confirm_ (после TTS)
-            // Если confirm_ не вызван (не распознано) — перезапуск через паузу
-            if (isRecording && !pendingRestart) {
-                pendingRestart = true;
-                restartMic();
+    recognition.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const t = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                buffer += (buffer ? ' ' : '') + t.trim();
+                if (bufTimer) clearTimeout(bufTimer);
+                bufTimer = setTimeout(() => {
+                    const text = buffer.trim();
+                    buffer = '';
+                    if (!text) return;
+                    document.getElementById('voiceTranscript').textContent = '✓ ' + text;
+                    // На мобильном: стопаем микрофон перед обработкой (TTS перезапустит)
+                    if (isMobile) {
+                        try { recognition.stop(); } catch(e) {}
+                    }
+                    processVoice(text);
+                }, DEBOUNCE);
+                document.getElementById('voiceTranscript').textContent = '⏳ ' + buffer;
+            } else {
+                interim += t;
             }
-        };
-    } else {
-        // ПК: continuous + debounce (работает стабильно)
-        recognition.continuous = true;
-        recognition.interimResults = true;
+        }
+        if (interim) {
+            document.getElementById('voiceTranscript').textContent = '... ' + (buffer ? buffer + ' ' : '') + interim;
+        }
+    };
 
-        let buffer = '';
-        let bufTimer = null;
-
-        recognition.onresult = (event) => {
-            let interim = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const t = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    buffer += (buffer ? ' ' : '') + t.trim();
-                    if (bufTimer) clearTimeout(bufTimer);
-                    bufTimer = setTimeout(() => {
-                        const text = buffer.trim();
-                        buffer = '';
-                        if (text) {
-                            document.getElementById('voiceTranscript').textContent = '✓ ' + text;
-                            processVoice(text);
-                        }
-                    }, 1200);
-                    document.getElementById('voiceTranscript').textContent = '⏳ ' + buffer;
-                } else {
-                    interim += t;
+    recognition.onend = () => {
+        if (isRecording && !pendingRestart) {
+            // Перезапуск (если не ждём TTS)
+            setTimeout(() => {
+                if (isRecording && !pendingRestart) {
+                    try { recognition.start(); } catch(e) {}
                 }
-            }
-            if (interim) {
-                document.getElementById('voiceTranscript').textContent = '... ' + (buffer ? buffer + ' ' : '') + interim;
-            }
-        };
-
-        recognition.onend = () => {
-            if (isRecording) {
-                setTimeout(() => {
-                    if (isRecording) { try { recognition.start(); } catch(e) {} }
-                }, 300);
-            }
-        };
-    }
+            }, 400);
+        }
+    };
 
     recognition.onerror = (e) => {
         if (e.error === 'no-speech' || e.error === 'aborted') return;
