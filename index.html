@@ -482,7 +482,7 @@ function initSpeech() {
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    const DEBOUNCE = isMobile ? 2000 : 1200; // мобильный: 2 сек тишины, ПК: 1.2 сек
+    const DEBOUNCE = isMobile ? 1400 : 1200; // мобильный: 1.4 сек тишины, ПК: 1.2 сек
     let buffer = '';
     let bufTimer = null;
 
@@ -588,7 +588,7 @@ function restartMic() {
             document.getElementById('voiceStatus').classList.add('listening');
             try { recognition.start(); } catch(e) {}
         }
-    }, 1000);
+    }, 500);
 }
 
 function confirm_(text, success) {
@@ -608,7 +608,7 @@ function confirm_(text, success) {
         pendingRestart = true;
         u.onend = () => {
             // Пауза после TTS чтобы эхо затихло
-            setTimeout(() => { restartMic(); }, 600);
+            setTimeout(() => { restartMic(); }, 300);
         };
         u.onerror = () => { restartMic(); };
     }
