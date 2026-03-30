@@ -115,6 +115,18 @@
         .voice-status.listening { color: #e74c3c; font-weight: 600; }
         .voice-transcript { margin-top: 6px; font-size: 0.8rem; color: #333; min-height: 18px; font-style: italic; }
 
+        /* === Toast === */
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: #16213e; color: #fff; padding: 10px 24px; border-radius: 10px;
+            font-size: 0.9rem; font-weight: 600; z-index: 200;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3); max-width: 90vw; text-align: center;
+        }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #27ae60; }
+        .toast.error { background: #e74c3c; }
+
         /* === Подсказка (сворачиваемая) === */
         .hint {
             background: #e8f0fe; border-radius: 8px; padding: 10px 14px;
@@ -274,6 +286,9 @@
         <div class="voice-transcript" id="voiceTranscript"></div>
     </div>
 
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
     <!-- Лог -->
     <div class="log-panel">
         <h3>&#128203; Журнал</h3>
@@ -415,29 +430,23 @@ function setManual(code) {
     document.getElementById('modalOverlay').classList.remove('show');
 }
 
-// ============ VOICE (с защитой от самослышания) ============
+// ============ PLATFORM DETECT ============
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// ============ TOAST (визуальное подтверждение) ============
+let toastTimer = null;
+function showToast(text, type) {
+    const el = document.getElementById('toast');
+    el.textContent = text;
+    el.className = 'toast show' + (type ? ' ' + type : '');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = 'toast'; }, 2000);
+}
+
+// ============ VOICE ============
 let recognition = null;
 let isRecording = false;
-let isSpeaking = false;  // TTS сейчас говорит — игнорируем распознавание
-
-// Debounce-буфер
-let voiceBuffer = '';
-let voiceTimer = null;
-const DEBOUNCE_MS = 1500;
-
-function flushVoiceBuffer() {
-    voiceTimer = null;
-    const text = voiceBuffer.trim();
-    voiceBuffer = '';
-    if (!text) return;
-    // Если TTS сейчас говорит — выбросить (это эхо)
-    if (isSpeaking) {
-        console.log('Skipped echo:', text);
-        return;
-    }
-    document.getElementById('voiceTranscript').textContent = '✓ ' + text;
-    processVoice(text);
-}
+let restartTimer = null;
 
 function initSpeech() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -447,44 +456,79 @@ function initSpeech() {
     }
     recognition = new SR();
     recognition.lang = 'ru-RU';
-    recognition.continuous = true;
-    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event) => {
-        // Если TTS говорит — полностью игнорируем
-        if (isSpeaking) return;
+    if (isMobile) {
+        // МОБИЛЬНЫЙ: одна фраза за раз, без continuous
+        // API сам определяет конец речи по паузе, возвращает ПОЛНЫЙ результат
+        recognition.continuous = false;
+        recognition.interimResults = false;
 
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            const t = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                voiceBuffer += (voiceBuffer ? ' ' : '') + t.trim();
-                if (voiceTimer) clearTimeout(voiceTimer);
-                voiceTimer = setTimeout(flushVoiceBuffer, DEBOUNCE_MS);
-                document.getElementById('voiceTranscript').textContent = '⏳ ' + voiceBuffer;
-            } else {
-                interim += t;
+        recognition.onresult = (event) => {
+            const text = event.results[0][0].transcript.trim();
+            if (!text) return;
+            document.getElementById('voiceTranscript').textContent = '✓ ' + text;
+            processVoice(text);
+        };
+
+        recognition.onend = () => {
+            // Автоперезапуск через паузу (ждём пока toast покажется)
+            if (isRecording) {
+                document.getElementById('voiceStatus').textContent = '⏸ Пауза...';
+                restartTimer = setTimeout(() => {
+                    if (isRecording) {
+                        document.getElementById('voiceStatus').textContent = '🔴 Слушаю...';
+                        document.getElementById('voiceStatus').classList.add('listening');
+                        try { recognition.start(); } catch(e) {}
+                    }
+                }, 1500);
             }
-        }
-        if (interim) {
-            document.getElementById('voiceTranscript').textContent = '... ' + (voiceBuffer ? voiceBuffer + ' ' : '') + interim;
-        }
-    };
+        };
+    } else {
+        // ПК: continuous + debounce (работает стабильно)
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        let buffer = '';
+        let bufTimer = null;
+
+        recognition.onresult = (event) => {
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const t = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    buffer += (buffer ? ' ' : '') + t.trim();
+                    if (bufTimer) clearTimeout(bufTimer);
+                    bufTimer = setTimeout(() => {
+                        const text = buffer.trim();
+                        buffer = '';
+                        if (text) {
+                            document.getElementById('voiceTranscript').textContent = '✓ ' + text;
+                            processVoice(text);
+                        }
+                    }, 1200);
+                    document.getElementById('voiceTranscript').textContent = '⏳ ' + buffer;
+                } else {
+                    interim += t;
+                }
+            }
+            if (interim) {
+                document.getElementById('voiceTranscript').textContent = '... ' + (buffer ? buffer + ' ' : '') + interim;
+            }
+        };
+
+        recognition.onend = () => {
+            if (isRecording) {
+                setTimeout(() => {
+                    if (isRecording) { try { recognition.start(); } catch(e) {} }
+                }, 300);
+            }
+        };
+    }
 
     recognition.onerror = (e) => {
         if (e.error === 'no-speech' || e.error === 'aborted') return;
         console.error('Speech error:', e.error);
-    };
-
-    recognition.onend = () => {
-        if (isRecording) {
-            setTimeout(() => {
-                if (isRecording) {
-                    try { recognition.start(); } catch(e) {}
-                }
-            }, 400);
-        }
     };
 }
 
@@ -492,9 +536,8 @@ function toggleRecording() {
     if (!recognition) { initSpeech(); if (!recognition) return; }
     if (isRecording) {
         isRecording = false;
+        if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; }
         recognition.stop();
-        // Сбросить буфер если есть
-        if (voiceTimer) { clearTimeout(voiceTimer); flushVoiceBuffer(); }
         document.getElementById('micBtn').classList.remove('recording');
         document.getElementById('voiceStatus').textContent = 'Запись остановлена';
         document.getElementById('voiceStatus').classList.remove('listening');
@@ -502,35 +545,20 @@ function toggleRecording() {
         isRecording = true;
         try { recognition.start(); } catch(e) {}
         document.getElementById('micBtn').classList.add('recording');
-        document.getElementById('voiceStatus').textContent = 'Слушаю...';
+        document.getElementById('voiceStatus').textContent = '🔴 Слушаю...';
         document.getElementById('voiceStatus').classList.add('listening');
     }
 }
 
-// ============ TTS (с блокировкой распознавания) ============
-function speak(text) {
-    if (!window.speechSynthesis) return;
-    // Отмечаем что говорим — recognition будет игнорировать вход
-    isSpeaking = true;
-    // Очищаем буфер — всё что пришло во время speak это эхо
-    voiceBuffer = '';
-    if (voiceTimer) { clearTimeout(voiceTimer); voiceTimer = null; }
-
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ru-RU';
-    u.rate = 1.3;
-    u.volume = 0.6;
-    u.onend = () => {
-        // Ждём ещё чуть-чуть после окончания TTS — эхо может прийти с задержкой
-        setTimeout(() => {
-            isSpeaking = false;
-            voiceBuffer = ''; // на всякий случай сбросить остаточное эхо
-        }, 800);
-    };
-    u.onerror = () => {
-        setTimeout(() => { isSpeaking = false; }, 500);
-    };
-    window.speechSynthesis.speak(u);
+// ============ FEEDBACK (toast + TTS только на ПК) ============
+function confirm_(text, success) {
+    showToast(text, success ? 'success' : 'error');
+    // TTS только на ПК — на мобильном микрофон ловит динамик
+    if (!isMobile && window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'ru-RU'; u.rate = 1.3; u.volume = 0.5;
+        window.speechSynthesis.speak(u);
+    }
 }
 
 // ============ NLP PARSER ============
@@ -542,7 +570,7 @@ function processVoice(text) {
         const ta = document.getElementById('mucosaText');
         ta.value += (ta.value ? ' ' : '') + text;
         addLogRaw('📝 ' + text);
-        speak('Записано');
+        confirm_('Записано', true);
         return;
     }
 
@@ -553,9 +581,10 @@ function processVoice(text) {
         data[quadrant][num] = isClear ? '' : code;
         updateTooth(quadrant, num);
         addLog(quadrant, num, isClear ? '' : code, prev, 'голос');
-        speak(formatConfirmation(quadrant, num, isClear ? '' : code));
+        confirm_(formatConfirmation(quadrant, num, isClear ? '' : code), true);
     } else {
         addLogRaw('⚠️ «' + text + '»');
+        confirm_('Не распознано: ' + text, false);
     }
 }
 
