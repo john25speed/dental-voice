@@ -630,7 +630,6 @@ function restartMic() {
     restartTimer = setTimeout(() => {
         pendingRestart = false;
         if (isRecording) {
-            beepReady();
             document.getElementById('voiceStatus').textContent = '🔴 Слушаю...';
             document.getElementById('voiceStatus').classList.add('listening');
             try { recognition.start(); } catch(e) {}
