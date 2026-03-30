@@ -160,6 +160,14 @@
             box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 14px;
         }
         .extra-panel h3 { font-size: 0.8rem; margin-bottom: 8px; }
+        .extra-panel .dictate-row { display: flex; gap: 8px; align-items: flex-start; }
+        .extra-panel textarea { flex: 1; }
+        .extra-panel .mic-small {
+            width: 40px; height: 40px; border-radius: 50%; border: none;
+            background: #4a90d9; color: #fff; font-size: 1.1rem; cursor: pointer;
+            flex-shrink: 0; -webkit-tap-highlight-color: transparent;
+        }
+        .extra-panel .mic-small.recording { background: #e74c3c; animation: pulse 1.5s infinite; }
         .extra-panel textarea {
             width: 100%; height: 70px; border: 2px solid #ddd; border-radius: 8px;
             padding: 8px; font-size: 0.8rem; resize: vertical; font-family: inherit;
@@ -300,7 +308,10 @@
     <!-- Слизистая -->
     <div class="extra-panel">
         <h3>Состояние слизистой, дёсен, нёба</h3>
-        <textarea id="mucosaText" placeholder="Диктуйте или введите вручную..."></textarea>
+        <div class="dictate-row">
+            <textarea id="mucosaText" placeholder="Нажмите микрофон для диктовки или введите вручную..."></textarea>
+            <button class="mic-small" id="mucosaMic" onclick="toggleMucosa()">&#127908;</button>
+        </div>
     </div>
 
     <div class="actions">
@@ -714,6 +725,76 @@ function undoEntry(idx) {
     updateTooth(entry.quadrant, entry.num);
     logEntries.splice(idx, 1);
     renderLog();
+}
+
+// ============ MUCOSA DICTATION (отдельный микрофон для поля слизистой) ============
+let mucosaRec = null;
+let mucosaRecording = false;
+
+function toggleMucosa() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+
+    if (mucosaRecording) {
+        mucosaRecording = false;
+        if (mucosaRec) mucosaRec.stop();
+        document.getElementById('mucosaMic').classList.remove('recording');
+        return;
+    }
+
+    // Остановить основной микрофон если работает
+    if (isRecording) toggleRecording();
+
+    mucosaRec = new SR();
+    mucosaRec.lang = 'ru-RU';
+    mucosaRec.continuous = !isMobile;
+    mucosaRec.interimResults = true;
+
+    const ta = document.getElementById('mucosaText');
+    let baseText = ta.value;
+
+    mucosaRec.onresult = (event) => {
+        let final = '', interim = '';
+        for (let i = 0; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+                final += event.results[i][0].transcript;
+            } else {
+                interim += event.results[i][0].transcript;
+            }
+        }
+        if (final) {
+            baseText += (baseText && !baseText.endsWith(' ') ? ' ' : '') + final.trim();
+            ta.value = baseText;
+        }
+        if (interim) {
+            ta.value = baseText + (baseText ? ' ' : '') + interim;
+        }
+    };
+
+    mucosaRec.onend = () => {
+        if (mucosaRecording && isMobile) {
+            // На мобильном перезапускаем
+            baseText = ta.value;
+            setTimeout(() => {
+                if (mucosaRecording) { try { mucosaRec.start(); } catch(e) {} }
+            }, 500);
+        } else if (mucosaRecording && !isMobile) {
+            setTimeout(() => {
+                if (mucosaRecording) { try { mucosaRec.start(); } catch(e) {} }
+            }, 300);
+        } else {
+            document.getElementById('mucosaMic').classList.remove('recording');
+        }
+    };
+
+    mucosaRec.onerror = (e) => {
+        if (e.error === 'no-speech' || e.error === 'aborted') return;
+    };
+
+    mucosaRecording = true;
+    document.getElementById('mucosaMic').classList.add('recording');
+    try { mucosaRec.start(); } catch(e) {}
+    showToast('Диктуйте состояние слизистой...', 'success');
 }
 
 // ============ EXPORT ============
