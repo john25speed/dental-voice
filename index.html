@@ -492,16 +492,11 @@ function initSpeech() {
         };
 
         recognition.onend = () => {
-            // Автоперезапуск через паузу (ждём пока toast покажется)
-            if (isRecording) {
-                document.getElementById('voiceStatus').textContent = '⏸ Пауза...';
-                restartTimer = setTimeout(() => {
-                    if (isRecording) {
-                        document.getElementById('voiceStatus').textContent = '🔴 Слушаю...';
-                        document.getElementById('voiceStatus').classList.add('listening');
-                        try { recognition.start(); } catch(e) {}
-                    }
-                }, 1500);
+            // Перезапуск управляется из confirm_ (после TTS)
+            // Если confirm_ не вызван (не распознано) — перезапуск через паузу
+            if (isRecording && !pendingRestart) {
+                pendingRestart = true;
+                restartMic();
             }
         };
     } else {
@@ -570,15 +565,44 @@ function toggleRecording() {
     }
 }
 
-// ============ FEEDBACK (toast + TTS только на ПК) ============
+// ============ FEEDBACK (toast + TTS) ============
+let pendingRestart = false;
+
+function restartMic() {
+    document.getElementById('voiceStatus').textContent = '⏸ Пауза...';
+    restartTimer = setTimeout(() => {
+        pendingRestart = false;
+        if (isRecording) {
+            document.getElementById('voiceStatus').textContent = '🔴 Слушаю...';
+            document.getElementById('voiceStatus').classList.add('listening');
+            try { recognition.start(); } catch(e) {}
+        }
+    }, 1000);
+}
+
 function confirm_(text, success) {
     showToast(text, success ? 'success' : 'error');
-    // TTS только на ПК — на мобильном микрофон ловит динамик
-    if (!isMobile && window.speechSynthesis) {
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'ru-RU'; u.rate = 1.3; u.volume = 0.5;
-        window.speechSynthesis.speak(u);
+    if (!window.speechSynthesis) {
+        // Нет TTS — просто перезапуск мик с паузой
+        if (isMobile && isRecording) { pendingRestart = true; restartMic(); }
+        return;
     }
+
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ru-RU'; u.rate = 1.3; u.volume = 0.6;
+
+    if (isMobile) {
+        // Мобильный: recognition уже остановлен (continuous=false, onend сработал)
+        // Говорим TTS, после окончания — перезапускаем микрофон
+        pendingRestart = true;
+        u.onend = () => {
+            // Пауза после TTS чтобы эхо затихло
+            setTimeout(() => { restartMic(); }, 600);
+        };
+        u.onerror = () => { restartMic(); };
+    }
+
+    window.speechSynthesis.speak(u);
 }
 
 // ============ NLP PARSER ============
