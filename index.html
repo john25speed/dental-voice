@@ -690,7 +690,7 @@ function parseToothCommand(text) {
     // Убираем пунктуацию, нормализуем
     text = text.replace(/[.,;:!?]/g, ' ').replace(/\s+/g, ' ').trim();
 
-    const isClear = /очист|стер|убр|удал|снять|сброс/.test(text);
+    const isClear = /очист|стереть|сотри|убери|убрать|удали|удалить|снять|сброс/.test(text);
 
     // Квадрант — ищем ЛЮБЫЕ вхождения слов в ЛЮБОМ порядке
     let jaw = null, side = null;
