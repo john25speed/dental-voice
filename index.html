@@ -636,6 +636,21 @@ function setManual(code) {
 let recognition = null;
 let isRecording = false;
 
+// Debounce: на мобильном Web Speech API часто разбивает фразу на куски,
+// каждый приходит как isFinal. Собираем в буфер, обрабатываем после паузы.
+let voiceBuffer = '';
+let voiceTimer = null;
+const VOICE_DEBOUNCE_MS = 1200; // ждём 1.2с тишины перед обработкой
+
+function flushVoiceBuffer() {
+    voiceTimer = null;
+    const text = voiceBuffer.trim();
+    voiceBuffer = '';
+    if (!text) return;
+    document.getElementById('voiceTranscript').textContent = '✓ ' + text;
+    processVoice(text);
+}
+
 function initSpeech() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
@@ -653,14 +668,17 @@ function initSpeech() {
         for (let i = event.resultIndex; i < event.results.length; i++) {
             const t = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                processVoice(t.trim());
-                document.getElementById('voiceTranscript').textContent = '✓ ' + t.trim();
+                // Добавляем в буфер, сбрасываем таймер
+                voiceBuffer += (voiceBuffer ? ' ' : '') + t.trim();
+                if (voiceTimer) clearTimeout(voiceTimer);
+                voiceTimer = setTimeout(flushVoiceBuffer, VOICE_DEBOUNCE_MS);
+                document.getElementById('voiceTranscript').textContent = '⏳ ' + voiceBuffer;
             } else {
                 interim += t;
             }
         }
         if (interim) {
-            document.getElementById('voiceTranscript').textContent = '... ' + interim;
+            document.getElementById('voiceTranscript').textContent = '... ' + (voiceBuffer ? voiceBuffer + ' ' : '') + interim;
         }
     };
 
@@ -672,8 +690,22 @@ function initSpeech() {
     };
 
     recognition.onend = () => {
+        // Когда recognition останавливается (мобильный делает это часто),
+        // даём буферу дообработаться, потом перезапускаем
         if (isRecording) {
-            try { recognition.start(); } catch(e) {}
+            // Если в буфере что-то есть — обработаем перед рестартом
+            if (voiceBuffer && voiceTimer) {
+                clearTimeout(voiceTimer);
+                voiceTimer = setTimeout(() => {
+                    flushVoiceBuffer();
+                }, VOICE_DEBOUNCE_MS);
+            }
+            // Перезапуск с задержкой чтобы не конфликтовать
+            setTimeout(() => {
+                if (isRecording) {
+                    try { recognition.start(); } catch(e) {}
+                }
+            }, 300);
         }
     };
 }
@@ -718,8 +750,8 @@ function processVoice(text) {
         addLog(quadrant, num, isClear ? '' : code, prev, 'голос');
         speak(formatConfirmation(quadrant, num, isClear ? '' : code));
     } else {
+        // Не спамим "не понял" — просто лог. Стоматолог увидит и повторит.
         addLogRaw('⚠️ Не распознано: «' + text + '»');
-        speak('Не понял, повторите');
     }
 }
 
