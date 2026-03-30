@@ -488,29 +488,56 @@ function initSpeech() {
 
     recognition.onresult = (event) => {
         let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-            const t = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                buffer += (buffer ? ' ' : '') + t.trim();
+
+        if (isMobile) {
+            // МОБИЛЬНЫЙ: каждый isFinal содержит ВЕСЬ текст нарастающим итогом
+            // Берём ПОСЛЕДНИЙ финальный результат — он самый полный
+            let lastFinal = '';
+            for (let i = 0; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    lastFinal = event.results[i][0].transcript.trim();
+                } else {
+                    interim = event.results[i][0].transcript;
+                }
+            }
+            if (lastFinal) {
+                buffer = lastFinal; // заменяем, не добавляем!
                 if (bufTimer) clearTimeout(bufTimer);
                 bufTimer = setTimeout(() => {
                     const text = buffer.trim();
                     buffer = '';
                     if (!text) return;
                     document.getElementById('voiceTranscript').textContent = '✓ ' + text;
-                    // На мобильном: стопаем микрофон перед обработкой (TTS перезапустит)
-                    if (isMobile) {
-                        try { recognition.stop(); } catch(e) {}
-                    }
+                    try { recognition.stop(); } catch(e) {}
                     processVoice(text);
                 }, DEBOUNCE);
                 document.getElementById('voiceTranscript').textContent = '⏳ ' + buffer;
-            } else {
-                interim += t;
             }
-        }
-        if (interim) {
-            document.getElementById('voiceTranscript').textContent = '... ' + (buffer ? buffer + ' ' : '') + interim;
+            if (interim) {
+                document.getElementById('voiceTranscript').textContent = '... ' + interim;
+            }
+        } else {
+            // ПК: resultIndex работает корректно, можно накапливать
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const t = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    buffer += (buffer ? ' ' : '') + t.trim();
+                    if (bufTimer) clearTimeout(bufTimer);
+                    bufTimer = setTimeout(() => {
+                        const text = buffer.trim();
+                        buffer = '';
+                        if (!text) return;
+                        document.getElementById('voiceTranscript').textContent = '✓ ' + text;
+                        processVoice(text);
+                    }, DEBOUNCE);
+                    document.getElementById('voiceTranscript').textContent = '⏳ ' + buffer;
+                } else {
+                    interim += t;
+                }
+            }
+            if (interim) {
+                document.getElementById('voiceTranscript').textContent = '... ' + (buffer ? buffer + ' ' : '') + interim;
+            }
         }
     };
 
