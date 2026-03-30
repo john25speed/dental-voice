@@ -613,7 +613,7 @@ function toggleRecording() {
         document.getElementById('voiceStatus').textContent = 'Запись остановлена';
         document.getElementById('voiceStatus').classList.remove('listening');
     } else {
-        beepStart();
+        if (!isMobile) beepStart();
         isRecording = true;
         try { recognition.start(); } catch(e) {}
         document.getElementById('micBtn').classList.add('recording');
@@ -684,7 +684,7 @@ function processVoice(text) {
         addLog(quadrant, num, isClear ? '' : code, prev, 'голос');
         confirm_(formatConfirmation(quadrant, num, isClear ? '' : code), true);
     } else {
-        beepError();
+        if (!isMobile) beepError();
         addLogRaw('⚠️ «' + text + '»');
         confirm_('Повторите команду', false);
     }
