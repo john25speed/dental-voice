@@ -233,9 +233,18 @@
         }
 
         @media print {
-            .voice-panel, .log-panel, .hint, .actions { display: none !important; }
-            body { background: #fff; }
-            .dental-chart, .extra-panel, .patient-info { box-shadow: none; border: 1px solid #ccc; }
+            .voice-panel, .log-panel, .hint, .actions, .toast, .mic-small { display: none !important; }
+            body { background: #fff; margin: 0; padding: 0; }
+            .container { padding: 0; margin: 0; max-width: 100%; }
+            .dental-chart, .extra-panel, .patient-info {
+                box-shadow: none; border: 1px solid #ccc;
+                margin-bottom: 8px; padding: 8px;
+                page-break-inside: avoid;
+            }
+            h1 { font-size: 1.1rem; margin-bottom: 2px; }
+            .subtitle { margin-bottom: 6px; font-size: 0.7rem; }
+            .extra-panel textarea { border: 1px solid #ccc; height: auto; min-height: 40px; }
+            .dictate-row { display: block !important; }
         }
     </style>
 </head>
@@ -727,6 +736,50 @@ function undoEntry(idx) {
     renderLog();
 }
 
+// ============ AUTO PUNCTUATION ============
+function autoPunctuation(text, prevText) {
+    if (!text) return text;
+
+    // Первая буква заглавная если начало или после точки
+    const needCap = !prevText || /[.!?]\s*$/.test(prevText);
+    if (needCap) {
+        text = text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    // Запятые перед союзами/вводными словами
+    const commaBeforeWords = [
+        'который', 'которая', 'которое', 'которые', 'которого', 'которой', 'которым', 'которых',
+        'что', 'где', 'когда', 'если', 'хотя', 'потому что', 'так как', 'однако',
+        'но', 'а также', 'а именно', 'то есть', 'в частности',
+        'причём', 'причем', 'при этом', 'вследствие чего',
+    ];
+    for (const w of commaBeforeWords) {
+        // Ставим запятую перед словом если перед ним нет запятой/точки
+        const rx = new RegExp('([а-яё])\\s+(' + w + ')', 'gi');
+        text = text.replace(rx, '$1, $2');
+    }
+
+    // Запятые после вводных слов
+    const commaAfterWords = [
+        'возможно', 'вероятно', 'очевидно', 'безусловно', 'несомненно',
+        'по-видимому', 'кроме того', 'таким образом', 'в целом',
+        'в общем', 'как правило', 'к сожалению', 'к счастью',
+    ];
+    for (const w of commaAfterWords) {
+        const rx = new RegExp('(^|[.!?]\\s+)(' + w + ')\\s', 'gi');
+        text = text.replace(rx, '$1$2, ');
+    }
+
+    // Точка в конце если предложение закончено (последнее слово — не предлог/союз)
+    const lastWord = text.trim().split(/\s+/).pop().toLowerCase();
+    const noEndDot = ['и', 'а', 'но', 'или', 'в', 'на', 'с', 'к', 'у', 'по', 'из', 'за', 'до', 'не'];
+    if (!noEndDot.includes(lastWord) && !/[.!?,;:]$/.test(text.trim())) {
+        text = text.trim() + '.';
+    }
+
+    return text;
+}
+
 // ============ MUCOSA DICTATION (отдельный микрофон для поля слизистой) ============
 let mucosaRec = null;
 let mucosaRecording = false;
@@ -763,7 +816,8 @@ function toggleMucosa() {
             }
         }
         if (final) {
-            baseText += (baseText && !baseText.endsWith(' ') ? ' ' : '') + final.trim();
+            let sentence = autoPunctuation(final.trim(), baseText);
+            baseText += (baseText && !baseText.endsWith(' ') ? ' ' : '') + sentence;
             ta.value = baseText;
         }
         if (interim) {
