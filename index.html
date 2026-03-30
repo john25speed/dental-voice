@@ -639,7 +639,7 @@ function processVoice(text) {
         confirm_(formatConfirmation(quadrant, num, isClear ? '' : code), true);
     } else {
         addLogRaw('⚠️ «' + text + '»');
-        confirm_('Не распознано: ' + text, false);
+        confirm_('Повторите команду', false);
     }
 }
 
