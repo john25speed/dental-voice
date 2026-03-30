@@ -233,17 +233,37 @@
         }
 
         @media print {
-            .voice-panel, .log-panel, .hint, .actions, .toast, .mic-small { display: none !important; }
-            body { background: #fff; margin: 0; padding: 0; }
-            .container { padding: 0; margin: 0; max-width: 100%; }
-            .dental-chart, .extra-panel, .patient-info {
-                box-shadow: none; border: 1px solid #ccc;
-                margin-bottom: 8px; padding: 8px;
-                page-break-inside: avoid;
+            .voice-panel, .log-panel, .hint, .actions, .toast, .mic-small,
+            .subtitle, .modal-overlay { display: none !important; }
+            * { margin: 0 !important; padding: 0 !important; box-shadow: none !important; }
+            body { background: #fff; font-size: 11px; }
+            .container { max-width: 100%; }
+            h1 { font-size: 14px; padding: 4px 0 !important; }
+            .patient-info {
+                display: flex !important; gap: 8px !important; padding: 4px !important;
+                border: 1px solid #ccc; margin-bottom: 4px !important;
             }
-            h1 { font-size: 1.1rem; margin-bottom: 2px; }
-            .subtitle { margin-bottom: 6px; font-size: 0.7rem; }
-            .extra-panel textarea { border: 1px solid #ccc; height: auto; min-height: 40px; }
+            .patient-info input { border: none; border-bottom: 1px solid #000; padding: 2px 4px !important; font-size: 11px; }
+            .dental-chart {
+                border: 1px solid #ccc; padding: 6px !important; margin-bottom: 4px !important;
+            }
+            .chart-title { font-size: 12px; margin-bottom: 4px !important; }
+            .jaw-label { font-size: 9px; margin: 1px 0 !important; }
+            .teeth-grid { gap: 1px !important; }
+            .tooth-val { height: 22px !important; line-height: 22px !important; font-size: 9px !important; border: 1px solid #999 !important; }
+            .tooth-num { font-size: 8px !important; }
+            .h-line { height: 1px !important; margin: 1px 0 !important; }
+            .legend { padding-top: 4px !important; margin-top: 4px !important; gap: 2px !important; }
+            .legend-item { font-size: 8px; padding: 0 3px !important; }
+            .extra-panel {
+                border: 1px solid #ccc; padding: 4px !important; margin-bottom: 0 !important;
+            }
+            .extra-panel h3 { font-size: 10px; margin-bottom: 2px !important; }
+            .extra-panel textarea {
+                border: none !important; border-bottom: 1px solid #000 !important;
+                height: auto !important; min-height: 20px; font-size: 10px;
+                padding: 2px !important; resize: none;
+            }
             .dictate-row { display: block !important; }
         }
     </style>
