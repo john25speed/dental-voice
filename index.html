@@ -582,12 +582,15 @@ function initSpeech() {
 
     recognition.onend = () => {
         if (isRecording && !pendingRestart) {
-            // Очищаем буфер при рестарте — чтобы хвост не подхватился
-            buffer = '';
-            if (bufTimer) { clearTimeout(bufTimer); bufTimer = null; }
+            if (!isMobile) {
+                // Только на ПК: очищаем буфер при рестарте — чтобы хвост не подхватился
+                buffer = '';
+                if (bufTimer) { clearTimeout(bufTimer); bufTimer = null; }
+            }
+            // На мобильном — НЕ трогаем буфер, debounce должен дообработать
             setTimeout(() => {
                 if (isRecording && !pendingRestart) {
-                    beepReady();
+                    if (!isMobile) beepReady();
                     try { recognition.start(); } catch(e) {}
                 }
             }, 400);
