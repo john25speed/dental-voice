@@ -566,6 +566,8 @@ function initSpeech() {
                         if (!text) return;
                         document.getElementById('voiceTranscript').textContent = '✓ ' + text;
                         processVoice(text);
+                        // Бип — готов слушать следующую команду
+                        setTimeout(() => beepReady(), 300);
                     }, DEBOUNCE);
                     document.getElementById('voiceTranscript').textContent = '⏳ ' + buffer;
                 } else {
