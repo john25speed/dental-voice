@@ -473,6 +473,23 @@ function setManual(code) {
 // ============ PLATFORM DETECT ============
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+// ============ BEEP (звуковой сигнал через Web Audio API) ============
+let audioCtx = null;
+function beep(freq, duration, vol) {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = freq || 800;
+    gain.gain.value = vol || 0.15;
+    osc.start();
+    osc.stop(audioCtx.currentTime + (duration || 0.12));
+}
+function beepStart() { beep(880, 0.1, 0.12); }  // высокий короткий — начало
+function beepReady() { beep(660, 0.08, 0.1); }   // средний — готов слушать снова
+function beepError() { beep(330, 0.2, 0.1); }    // низкий — ошибка
+
 // ============ TOAST (визуальное подтверждение) ============
 let toastTimer = null;
 function showToast(text, type) {
@@ -563,9 +580,12 @@ function initSpeech() {
 
     recognition.onend = () => {
         if (isRecording && !pendingRestart) {
-            // Перезапуск (если не ждём TTS)
+            // Очищаем буфер при рестарте — чтобы хвост не подхватился
+            buffer = '';
+            if (bufTimer) { clearTimeout(bufTimer); bufTimer = null; }
             setTimeout(() => {
                 if (isRecording && !pendingRestart) {
+                    beepReady();
                     try { recognition.start(); } catch(e) {}
                 }
             }, 400);
@@ -588,6 +608,7 @@ function toggleRecording() {
         document.getElementById('voiceStatus').textContent = 'Запись остановлена';
         document.getElementById('voiceStatus').classList.remove('listening');
     } else {
+        beepStart();
         isRecording = true;
         try { recognition.start(); } catch(e) {}
         document.getElementById('micBtn').classList.add('recording');
@@ -658,6 +679,7 @@ function processVoice(text) {
         addLog(quadrant, num, isClear ? '' : code, prev, 'голос');
         confirm_(formatConfirmation(quadrant, num, isClear ? '' : code), true);
     } else {
+        beepError();
         addLogRaw('⚠️ «' + text + '»');
         confirm_('Повторите команду', false);
     }
