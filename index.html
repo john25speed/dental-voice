@@ -601,6 +601,9 @@ async function processAudio(blob) {
         });
         const result = await resp.json();
 
+        // Логируем что услышал Whisper
+        addLogRaw('🎤 «' + text + '»');
+
         if (result.error && !result.teeth?.length) {
             transcriptEl.textContent = '⚠️ «' + text + '» — не распознано';
             addLogRaw('⚠️ «' + text + '»');
