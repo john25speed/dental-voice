@@ -283,10 +283,11 @@
     <details class="hint">
         <summary>Как пользоваться</summary>
         <br>
-        <b>Голос:</b> «верхний правый шесть кариес», «нижняя левая восьмёрка отсутствует»<br>
+        <b>Голос:</b> нажмите 🎤 → говорите → нажмите снова → GPT разберёт<br>
+        <b>Один зуб:</b> «верхний правый шесть кариес»<br>
+        <b>Несколько:</b> «верхний правый шесть кариес, семь пломба, восьмёрка отсутствует»<br>
         <b>Очистить:</b> «очистить верхний правый три»<br>
-        <b>Тап:</b> нажмите на ячейку зуба для ручного выбора<br>
-        <b>Совет:</b> говорите чётко, между командами делайте паузу ~2 сек
+        <b>Тап:</b> нажмите на ячейку для ручного выбора
     </details>
 
     <!-- Зубная формула — CSS Grid, всегда влезает -->
@@ -321,6 +322,16 @@
         <button class="mic-btn" id="micBtn" onclick="toggleRecording()">&#127908;</button>
         <div class="voice-status" id="voiceStatus">Нажмите для записи</div>
         <div class="voice-transcript" id="voiceTranscript"></div>
+    </div>
+
+    <!-- Переключатель режима -->
+    <div style="text-align:center;margin-bottom:10px;">
+        <button id="modeBtn" onclick="toggleMode()" style="
+            padding:6px 16px; border:2px solid #4a90d9; border-radius:20px;
+            background:#fff; color:#4a90d9; font-size:0.8rem; font-weight:600;
+            cursor:pointer; transition:all 0.2s;
+        ">&#9998; По одному зубу</button>
+        <div id="modeHint" style="font-size:0.7rem;color:#888;margin-top:4px;">Один зуб за команду</div>
     </div>
 
     <!-- Toast -->
@@ -379,6 +390,25 @@ const quadrants = ['UR','UL','LR','LL'];
 quadrants.forEach(q => { data[q] = {}; for (let i = 1; i <= 8; i++) data[q][i] = ''; });
 const logEntries = [];
 let selectedTooth = null;
+
+// ============ MODE (single / batch) ============
+let batchMode = false;
+function toggleMode() {
+    batchMode = !batchMode;
+    const btn = document.getElementById('modeBtn');
+    const hint = document.getElementById('modeHint');
+    if (batchMode) {
+        btn.textContent = '📋 Пачка зубов';
+        btn.style.background = '#4a90d9';
+        btn.style.color = '#fff';
+        hint.textContent = 'Называйте несколько зубов за раз';
+    } else {
+        btn.textContent = '✎ По одному зубу';
+        btn.style.background = '#fff';
+        btn.style.color = '#4a90d9';
+        hint.textContent = 'Один зуб за команду';
+    }
+}
 
 // ============ BUILD CHART (CSS Grid — всегда влезает) ============
 function buildChart() {
@@ -500,281 +530,163 @@ function showToast(text, type) {
     toastTimer = setTimeout(() => { el.className = 'toast'; }, 2000);
 }
 
-// ============ VOICE ============
-let recognition = null;
+// ============ VOICE (Whisper STT → GPT Parse) ============
+// Пакетный режим: нажал → наговорил → нажал → отправил → GPT → JSON → UI
 let isRecording = false;
-let restartTimer = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let audioContext = null;
 
-function initSpeech() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-        document.getElementById('voiceStatus').textContent = 'Нужен Chrome для голосового ввода';
-        return;
-    }
-    recognition = new SR();
-    recognition.lang = 'ru-RU';
-    recognition.maxAlternatives = 1;
+async function startRecording() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+    audioChunks = [];
 
-    // Единый режим: continuous + debounce (на мобильном дольше ждём)
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    const DEBOUNCE = isMobile ? 1400 : 1200; // мобильный: 1.4 сек тишины, ПК: 1.2 сек
-    let buffer = '';
-    let bufTimer = null;
-
-    recognition.onresult = (event) => {
-        let interim = '';
-
-        if (isMobile) {
-            // МОБИЛЬНЫЙ: каждый isFinal содержит ВЕСЬ текст нарастающим итогом
-            // Берём ПОСЛЕДНИЙ финальный результат — он самый полный
-            let lastFinal = '';
-            for (let i = 0; i < event.results.length; i++) {
-                if (event.results[i].isFinal) {
-                    lastFinal = event.results[i][0].transcript.trim();
-                } else {
-                    interim = event.results[i][0].transcript;
-                }
-            }
-            if (lastFinal) {
-                buffer = lastFinal; // заменяем, не добавляем!
-                if (bufTimer) clearTimeout(bufTimer);
-                bufTimer = setTimeout(() => {
-                    const text = buffer.trim();
-                    buffer = '';
-                    if (!text) return;
-                    document.getElementById('voiceTranscript').textContent = '✓ ' + text;
-                    try { recognition.stop(); } catch(e) {}
-                    processVoice(text);
-                }, DEBOUNCE);
-                document.getElementById('voiceTranscript').textContent = '⏳ ' + buffer;
-            }
-            if (interim) {
-                document.getElementById('voiceTranscript').textContent = '... ' + interim;
-            }
-        } else {
-            // ПК: resultIndex работает корректно, можно накапливать
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const t = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    buffer += (buffer ? ' ' : '') + t.trim();
-                    if (bufTimer) clearTimeout(bufTimer);
-                    bufTimer = setTimeout(() => {
-                        const text = buffer.trim();
-                        buffer = '';
-                        if (!text) return;
-                        document.getElementById('voiceTranscript').textContent = '✓ ' + text;
-                        processVoice(text);
-                        // Бип — готов слушать следующую команду (после TTS)
-                        setTimeout(() => beepReady(), 2000);
-                    }, DEBOUNCE);
-                    document.getElementById('voiceTranscript').textContent = '⏳ ' + buffer;
-                } else {
-                    interim += t;
-                }
-            }
-            if (interim) {
-                document.getElementById('voiceTranscript').textContent = '... ' + (buffer ? buffer + ' ' : '') + interim;
-            }
-        }
+    mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data);
     };
 
-    recognition.onend = () => {
-        if (isRecording && !pendingRestart) {
-            if (!isMobile) {
-                // Только на ПК: очищаем буфер при рестарте — чтобы хвост не подхватился
-                buffer = '';
-                if (bufTimer) { clearTimeout(bufTimer); bufTimer = null; }
-            }
-            // На мобильном — НЕ трогаем буфер, debounce должен дообработать
-            setTimeout(() => {
-                if (isRecording && !pendingRestart) {
-                    if (!isMobile) beepReady();
-                    try { recognition.start(); } catch(e) {}
-                }
-            }, 400);
-        }
-    };
-
-    recognition.onerror = (e) => {
-        if (e.error === 'no-speech' || e.error === 'aborted') return;
-        console.error('Speech error:', e.error);
-    };
+    mediaRecorder.start(500);
 }
 
-function toggleRecording() {
-    if (!recognition) { initSpeech(); if (!recognition) return; }
+function stopRecording() {
+    return new Promise(resolve => {
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') { resolve(null); return; }
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            mediaRecorder.stream.getTracks().forEach(t => t.stop());
+            audioChunks = [];
+            resolve(blob.size >= 5000 ? blob : null);
+        };
+        mediaRecorder.stop();
+    });
+}
+
+async function processAudio(blob) {
+    if (!blob) {
+        document.getElementById('voiceTranscript').textContent = '⚠️ Слишком короткая запись';
+        confirm_('Повторите', false);
+        return;
+    }
+
+    const statusEl = document.getElementById('voiceStatus');
+    const transcriptEl = document.getElementById('voiceTranscript');
+
+    // Шаг 1: Whisper STT
+    statusEl.textContent = '⏳ Распознаю речь...';
+    const formData = new FormData();
+    formData.append('audio', blob, 'voice.webm');
+
+    let text;
+    try {
+        const resp = await fetch('/transcribe', { method: 'POST', body: formData });
+        const d = await resp.json();
+        text = d.text && d.text.trim();
+        if (!text) { transcriptEl.textContent = '⚠️ Речь не распознана'; return; }
+        transcriptEl.textContent = '🎤 ' + text;
+    } catch (err) {
+        console.error('Whisper error:', err);
+        transcriptEl.textContent = '⚠️ Ошибка Whisper';
+        return;
+    }
+
+    // Шаг 2: GPT Parse
+    statusEl.textContent = '🧠 Анализирую...';
+    try {
+        const resp = await fetch('/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, mode: batchMode ? 'batch' : 'single' }),
+        });
+        const result = await resp.json();
+
+        if (result.error && !result.teeth?.length) {
+            transcriptEl.textContent = '⚠️ «' + text + '» — не распознано';
+            addLogRaw('⚠️ «' + text + '»');
+            confirm_('Повторите команду', false);
+            statusEl.textContent = 'Нажмите для записи';
+            return;
+        }
+
+        // Слизистая
+        if (result.mucosa) {
+            const ta = document.getElementById('mucosaText');
+            ta.value += (ta.value ? ' ' : '') + result.mucosa;
+            addLogRaw('📝 ' + result.mucosa);
+            confirm_('Записано', true);
+        }
+
+        // Зубы
+        if (result.teeth && result.teeth.length > 0) {
+            let applied = 0;
+            for (const tooth of result.teeth) {
+                const quadrant = (tooth.jaw === 'upper' ? 'U' : 'L') + (tooth.side === 'right' ? 'R' : 'L');
+                const num = tooth.num;
+                if (num < 1 || num > 8) continue;
+                const prev = data[quadrant][num];
+                data[quadrant][num] = tooth.clear ? '' : (tooth.code || '');
+                updateTooth(quadrant, num);
+                addLog(quadrant, num, tooth.clear ? '' : (tooth.code || ''), prev, 'голос');
+                applied++;
+            }
+            if (applied > 0) {
+                const msg = applied === 1
+                    ? formatConfirmation(
+                        (result.teeth[0].jaw === 'upper' ? 'U' : 'L') + (result.teeth[0].side === 'right' ? 'R' : 'L'),
+                        result.teeth[0].num,
+                        result.teeth[0].clear ? '' : result.teeth[0].code)
+                    : `Записано ${applied} зубов`;
+                confirm_(msg, true);
+            }
+        }
+
+        transcriptEl.textContent = '✓ ' + text;
+    } catch (err) {
+        console.error('Parse error:', err);
+        transcriptEl.textContent = '⚠️ Ошибка GPT';
+    }
+
+    statusEl.textContent = 'Нажмите для записи';
+}
+
+async function toggleRecording() {
     if (isRecording) {
+        // Остановка записи → обработка
         isRecording = false;
-        if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; }
-        recognition.stop();
         document.getElementById('micBtn').classList.remove('recording');
-        document.getElementById('voiceStatus').textContent = 'Запись остановлена';
+        document.getElementById('voiceStatus').textContent = '⏳ Обрабатываю...';
         document.getElementById('voiceStatus').classList.remove('listening');
+        const blob = await stopRecording();
+        await processAudio(blob);
     } else {
-        if (!isMobile) beepStart();
+        // Начало записи
+        beepStart();
         isRecording = true;
-        try { recognition.start(); } catch(e) {}
-        document.getElementById('micBtn').classList.add('recording');
-        document.getElementById('voiceStatus').textContent = '🔴 Слушаю...';
-        document.getElementById('voiceStatus').classList.add('listening');
+        try {
+            await startRecording();
+            document.getElementById('micBtn').classList.add('recording');
+            document.getElementById('voiceStatus').textContent = '🔴 Говорите...';
+            document.getElementById('voiceStatus').classList.add('listening');
+        } catch (err) {
+            isRecording = false;
+            console.error('Mic error:', err);
+            document.getElementById('voiceStatus').textContent = 'Ошибка доступа к микрофону';
+        }
     }
 }
 
 // ============ FEEDBACK (toast + TTS) ============
-let pendingRestart = false;
-
-function restartMic() {
-    document.getElementById('voiceStatus').textContent = '⏸ Пауза...';
-    restartTimer = setTimeout(() => {
-        pendingRestart = false;
-        if (isRecording) {
-            document.getElementById('voiceStatus').textContent = '🔴 Слушаю...';
-            document.getElementById('voiceStatus').classList.add('listening');
-            try { recognition.start(); } catch(e) {}
-        }
-    }, 500);
-}
-
 function confirm_(text, success) {
     showToast(text, success ? 'success' : 'error');
-    if (!window.speechSynthesis) {
-        // Нет TTS — просто перезапуск мик с паузой
-        if (isMobile && isRecording) { pendingRestart = true; restartMic(); }
-        return;
-    }
-
+    if (!window.speechSynthesis) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'ru-RU'; u.rate = 1.3; u.volume = 0.6;
-
-    if (isMobile) {
-        // Мобильный: recognition уже остановлен (continuous=false, onend сработал)
-        // Говорим TTS, после окончания — перезапускаем микрофон
-        pendingRestart = true;
-        u.onend = () => {
-            // Пауза после TTS чтобы эхо затихло
-            setTimeout(() => { restartMic(); }, 300);
-        };
-        u.onerror = () => { restartMic(); };
-    }
-
     window.speechSynthesis.speak(u);
 }
 
-// ============ NLP PARSER ============
-function processVoice(text) {
-    const lower = text.toLowerCase().trim();
-
-    // Слизистая
-    if (/^(слизист|десн|дёсн|нёбо|небо)/.test(lower)) {
-        const ta = document.getElementById('mucosaText');
-        ta.value += (ta.value ? ' ' : '') + text;
-        addLogRaw('📝 ' + text);
-        confirm_('Записано', true);
-        return;
-    }
-
-    const parsed = parseToothCommand(lower);
-    if (parsed) {
-        const { quadrant, num, code, isClear } = parsed;
-        const prev = data[quadrant][num];
-        data[quadrant][num] = isClear ? '' : code;
-        updateTooth(quadrant, num);
-        addLog(quadrant, num, isClear ? '' : code, prev, 'голос');
-        confirm_(formatConfirmation(quadrant, num, isClear ? '' : code), true);
-    } else {
-        if (!isMobile) beepError();
-        addLogRaw('⚠️ «' + text + '»');
-        confirm_('Повторите команду', false);
-    }
-}
-
-function parseToothCommand(text) {
-    // Убираем пунктуацию, нормализуем
-    text = text.replace(/[.,;:!?]/g, ' ').replace(/\s+/g, ' ').trim();
-
-    const isClear = /очист|стереть|сотри|убери|убрать|удали|удалить|снять|сброс/.test(text);
-
-    // Квадрант — ищем ЛЮБЫЕ вхождения слов в ЛЮБОМ порядке
-    let jaw = null, side = null;
-    if (/верхн|верх\./.test(text)) jaw = 'upper';
-    if (/нижн|ниж\./.test(text)) jaw = 'lower';
-    if (/прав/.test(text)) side = 'right';
-    if (/лев/.test(text)) side = 'left';
-
-    // Номер зуба — сначала цифра (берём ПОСЛЕДНЮЮ цифру — она самая актуальная)
-    let num = null;
-    const allDigits = text.match(/\d/g);
-    if (allDigits) num = parseInt(allDigits[allDigits.length - 1]);
-
-    // Потом слова — ВАЖНО: длинные слова ПЕРЕД короткими!
-    // "восемь" содержит "семь", "шесть" содержит "шесть" — порядок критичен
-    if (!num) {
-        const wordMap = [
-            // Сначала -ёрки (самые однозначные)
-            [/восьм[её]рк/, 8],
-            [/сем[её]рк/, 7],
-            [/шест[её]рк/, 6],
-            [/пят[её]рк/, 5],
-            [/четв[её]рк/, 4],
-            [/тройк/, 3],
-            [/двойк/, 2],
-            [/единиц|единичк/, 1],
-            // Числительные — ДЛИННЫЕ ПЕРЕД КОРОТКИМИ (восемь перед семь!)
-            [/восемь|восьм/, 8],
-            [/(?<!во)семь/, 7],  // "семь" но НЕ "восемь"
-            [/шесть/, 6],
-            [/пять/, 5],
-            [/четыр/, 4],
-            [/три(?!д|н|ц)/, 3],
-            [/два(?!д|ц)|две(?!р|н)/, 2],
-            [/одна(?!ж)|один(?!н)/, 1],
-            // Порядковые — тоже длинные первые
-            [/восьм(?:ой|ая|ое|ого)/, 8],
-            [/седьм/, 7],
-            [/шест(?:ой|ая|ое|ого)/, 6],
-            [/пят(?:ый|ая|ое|ого)/, 5],
-            [/четверт|четвёрт/, 4],
-            [/трет/, 3],
-            [/втор/, 2],
-            [/перв/, 1],
-        ];
-        for (const [rx, n] of wordMap) {
-            if (rx.test(text)) { num = n; break; }
-        }
-    }
-
-    if (!num || num < 1 || num > 8) return null;
-    if (!jaw || !side) return null;
-
-    const quadrant = (jaw === 'upper' ? 'U' : 'L') + (side === 'right' ? 'R' : 'L');
-    if (isClear) return { quadrant, num, code: '', isClear: true };
-
-    // Диагноз — ищем в любом месте текста
-    let code = null;
-    const diagMap = [
-        { patterns: ['отсутств', 'нет зуба', 'нету', 'удалён', 'удален', 'удалить'], code: 'О' },
-        { patterns: ['корень', 'корня', 'корни'], code: 'R' },
-        { patterns: ['кариес', 'кариос', 'кариез'], code: 'С' },
-        { patterns: ['пульпит'], code: 'Р' },
-        { patterns: ['периодонтит', 'переодонтит', 'периодонт'], code: 'Pt' },
-        { patterns: ['пломб', 'запломб', 'опломб'], code: 'П' },
-        { patterns: ['коронк', 'коронок'], code: 'К' },
-        { patterns: ['искусствен', 'имплант', 'имплан'], code: 'И' },
-        { patterns: ['пародонтит третьей', 'пародонтит 3', 'пародонтит три'], code: 'А III' },
-        { patterns: ['пародонтит второй', 'пародонтит 2', 'пародонтит два'], code: 'А II' },
-        { patterns: ['пародонтит первой', 'пародонтит 1', 'пародонтит один', 'пародонтит'], code: 'А I' },
-    ];
-    for (const d of diagMap) {
-        for (const p of d.patterns) {
-            if (text.includes(p)) { code = d.code; break; }
-        }
-        if (code) break;
-    }
-    if (!code) return null;
-    return { quadrant, num, code, isClear: false };
-}
+// ============ NLP PARSER (GPT-based, вызывается из processAudio) ============
+// Regex-парсер убран. Вся логика извлечения зубов — на сервере через GPT.
+// processAudio() вызывает /transcribe → /parse → применяет JSON к UI.
 
 function formatConfirmation(quadrant, num, code) {
     const qNames = { UR: 'верхний правый', UL: 'верхний левый', LR: 'нижний правый', LL: 'нижний левый' };
@@ -875,75 +787,66 @@ function autoPunctuation(text, prevText) {
     return text;
 }
 
-// ============ MUCOSA DICTATION (отдельный микрофон для поля слизистой) ============
-let mucosaRec = null;
+// ============ MUCOSA DICTATION (Whisper, пакетный режим) ============
+let mucosaRecorder = null;
 let mucosaRecording = false;
+let mucosaChunks = [];
 
-function toggleMucosa() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-
+async function toggleMucosa() {
     if (mucosaRecording) {
+        // Стоп → отправка
         mucosaRecording = false;
-        if (mucosaRec) mucosaRec.stop();
         document.getElementById('mucosaMic').classList.remove('recording');
+
+        const blob = await new Promise(resolve => {
+            if (!mucosaRecorder || mucosaRecorder.state === 'inactive') { resolve(null); return; }
+            mucosaRecorder.onstop = () => {
+                const b = new Blob(mucosaChunks, { type: 'audio/webm' });
+                mucosaRecorder.stream.getTracks().forEach(t => t.stop());
+                mucosaChunks = [];
+                resolve(b.size >= 5000 ? b : null);
+            };
+            mucosaRecorder.stop();
+        });
+
+        if (!blob) return;
+
+        const formData = new FormData();
+        formData.append('audio', blob, 'mucosa.webm');
+        try {
+            const resp = await fetch('/transcribe', { method: 'POST', body: formData });
+            const d = await resp.json();
+            if (d.text && d.text.trim()) {
+                const ta = document.getElementById('mucosaText');
+                let sentence = autoPunctuation(d.text.trim(), ta.value);
+                ta.value += (ta.value && !ta.value.endsWith(' ') ? ' ' : '') + sentence;
+                showToast('Записано', 'success');
+            }
+        } catch (err) {
+            console.error('Mucosa whisper error:', err);
+        }
         return;
     }
 
     // Остановить основной микрофон если работает
-    if (isRecording) toggleRecording();
+    if (isRecording) await toggleRecording();
 
-    mucosaRec = new SR();
-    mucosaRec.lang = 'ru-RU';
-    mucosaRec.continuous = !isMobile;
-    mucosaRec.interimResults = true;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mucosaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+        mucosaChunks = [];
 
-    const ta = document.getElementById('mucosaText');
-    let baseText = ta.value;
+        mucosaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) mucosaChunks.push(e.data);
+        };
 
-    mucosaRec.onresult = (event) => {
-        let final = '', interim = '';
-        for (let i = 0; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-                final += event.results[i][0].transcript;
-            } else {
-                interim += event.results[i][0].transcript;
-            }
-        }
-        if (final) {
-            let sentence = autoPunctuation(final.trim(), baseText);
-            baseText += (baseText && !baseText.endsWith(' ') ? ' ' : '') + sentence;
-            ta.value = baseText;
-        }
-        if (interim) {
-            ta.value = baseText + (baseText ? ' ' : '') + interim;
-        }
-    };
-
-    mucosaRec.onend = () => {
-        if (mucosaRecording && isMobile) {
-            // На мобильном перезапускаем
-            baseText = ta.value;
-            setTimeout(() => {
-                if (mucosaRecording) { try { mucosaRec.start(); } catch(e) {} }
-            }, 500);
-        } else if (mucosaRecording && !isMobile) {
-            setTimeout(() => {
-                if (mucosaRecording) { try { mucosaRec.start(); } catch(e) {} }
-            }, 300);
-        } else {
-            document.getElementById('mucosaMic').classList.remove('recording');
-        }
-    };
-
-    mucosaRec.onerror = (e) => {
-        if (e.error === 'no-speech' || e.error === 'aborted') return;
-    };
-
-    mucosaRecording = true;
-    document.getElementById('mucosaMic').classList.add('recording');
-    try { mucosaRec.start(); } catch(e) {}
-    showToast('Диктуйте состояние слизистой...', 'success');
+        mucosaRecording = true;
+        mucosaRecorder.start(500);
+        document.getElementById('mucosaMic').classList.add('recording');
+        showToast('Диктуйте — нажмите ещё раз для отправки', 'success');
+    } catch (err) {
+        console.error('Mucosa mic error:', err);
+    }
 }
 
 // ============ EXPORT ============
