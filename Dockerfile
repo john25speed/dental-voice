@@ -6,5 +6,5 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY . .
 
-EXPOSE 5055
-CMD ["gunicorn", "--bind", "0.0.0.0:5055", "--workers", "2", "server:app"]
+EXPOSE 7860
+CMD ["gunicorn", "--bind", "0.0.0.0:7860", "--workers", "2", "--timeout", "120", "server:app"]
