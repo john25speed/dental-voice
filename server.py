@@ -64,10 +64,24 @@ def index():
 @app.route('/health')
 def health():
     key = os.getenv('OPENAI_API_KEY', '')
+    # Тест связи с OpenAI
+    api_ok = False
+    api_error = None
+    try:
+        r = client.chat.completions.create(
+            model='gpt-4o-mini',
+            messages=[{'role': 'user', 'content': 'say ok'}],
+            max_tokens=3,
+        )
+        api_ok = True
+    except Exception as e:
+        api_error = f'{type(e).__name__}: {e}'
     return jsonify({
         'status': 'ok',
         'key_set': bool(key),
         'key_prefix': key[:12] + '...' if key else 'NOT SET',
+        'api_ok': api_ok,
+        'api_error': api_error,
     })
 
 
@@ -89,7 +103,9 @@ def transcribe():
             )
         return jsonify({'text': result.text})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'type': type(e).__name__}), 500
     finally:
         try:
             os.unlink(tmp_path)
