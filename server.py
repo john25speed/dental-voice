@@ -61,6 +61,16 @@ def index():
     return send_from_directory('.', 'index.html')
 
 
+@app.route('/health')
+def health():
+    key = os.getenv('OPENAI_API_KEY', '')
+    return jsonify({
+        'status': 'ok',
+        'key_set': bool(key),
+        'key_prefix': key[:12] + '...' if key else 'NOT SET',
+    })
+
+
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
     if 'audio' not in request.files:
