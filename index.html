@@ -330,8 +330,9 @@
             padding:6px 16px; border:2px solid #4a90d9; border-radius:20px;
             background:#fff; color:#4a90d9; font-size:0.8rem; font-weight:600;
             cursor:pointer; transition:all 0.2s;
-        ">&#9998; По одному зубу</button>
-        <div id="modeHint" style="font-size:0.7rem;color:#888;margin-top:4px;">Один зуб за команду</div>
+            background:#4a90d9; color:#fff;
+        ">&#128203; Пачка зубов</button>
+        <div id="modeHint" style="font-size:0.7rem;color:#888;margin-top:4px;">Называйте несколько зубов за раз</div>
     </div>
 
     <!-- Toast -->
@@ -392,7 +393,7 @@ const logEntries = [];
 let selectedTooth = null;
 
 // ============ MODE (single / batch) ============
-let batchMode = false;
+let batchMode = true;
 function toggleMode() {
     batchMode = !batchMode;
     const btn = document.getElementById('modeBtn');
